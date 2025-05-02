@@ -5,4 +5,9 @@
  * Plain-English specs that live in Git and block "Done" until every box turns green
  */
 
-console.log('CheckMate CLI - Hello World'); 
+import { printBanner } from './ui/banner.js';
+
+// Print the welcome banner
+printBanner();
+
+// TODO: Add command handling here 

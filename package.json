@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "**Writing README.md guidelines**",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "checkmate": "ts-node src/index.ts"
+    "checkmate": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts"
   },
   "keywords": [],
   "author": "",

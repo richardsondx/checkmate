@@ -12,3 +12,10 @@
 ✅ Added checkmate/specs, checkmate/logs, checkmate/cache directories
 ✅ Already included checkmate/** and .checkmate in .gitignore
 ✅ Added placeholder files and directory documentation
+
+## Step 3 - ASCII splash + welcome box
+✅ Created src/ui/banner.ts
+✅ Implemented printBanner() function using boxen and chalk
+✅ Added ASCII art and helper messages
+✅ Updated src/index.ts to call printBanner()
+✅ Updated project to use ESM modules for compatibility with chalk and boxen
