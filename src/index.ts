@@ -17,6 +17,7 @@ import * as affectedCommands from './commands/affected.js';
 import * as watchCommands from './commands/watch.js';
 import * as specs from './lib/specs.js';
 import { Argv } from 'yargs';
+import * as modelCommands from './commands/model.js';
 
 // Print the welcome banner
 printBanner();
@@ -219,6 +220,53 @@ yargsInstance
   // Watch command
   .command('watch', 'Start a live dashboard that monitors test runs', {}, async () => {
     await watchCommands.watch();
+  })
+  
+  // Model commands - using a command with subcommands approach
+  .command({
+    command: 'model <command>',
+    describe: 'Manage AI models',
+    builder: (yargs: Argv) => {
+      return yargs
+        .command({
+          command: 'list',
+          describe: 'List configured models',
+          handler: () => {
+            modelCommands.listModels();
+          }
+        })
+        .command({
+          command: 'info',
+          describe: 'Show detailed information about model slots',
+          handler: () => {
+            modelCommands.printModelInfo();
+          }
+        })
+        .command({
+          command: 'set <slot> <name>',
+          describe: 'Set a model for a specific slot',
+          builder: (yargs: Argv) => {
+            return yargs
+              .positional('slot', {
+                describe: 'Model slot (reason|quick)',
+                choices: ['reason', 'quick'],
+                type: 'string',
+                demandOption: true
+              })
+              .positional('name', {
+                describe: 'Model name (e.g., gpt-4o, gpt-4o-mini)',
+                type: 'string',
+                demandOption: true
+              });
+          },
+          handler: (argv: any) => {
+            modelCommands.setModel(argv.slot as 'reason' | 'quick', argv.name);
+          }
+        })
+        .demandCommand(1, 'You need to specify a valid model subcommand')
+        .help();
+    },
+    handler: () => {}
   })
   
   // Default command when none is provided

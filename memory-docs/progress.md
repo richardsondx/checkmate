@@ -69,3 +69,11 @@
 ✅ Added auto-updating when new log entries are detected
 ✅ Display shows pass/fail status with colored indicators
 ✅ Clear terminal and redraw for a smooth live dashboard experience
+
+## Step 10 - Model commands
+✅ Created src/commands/model.ts for model management
+✅ Implemented `checkmate model list` to show configured models
+✅ Implemented `checkmate model info` to show detailed model info
+✅ Implemented `checkmate model set <slot> <name>` to set models
+✅ Added subcommand structure to CLI parser
+✅ Verified model changes are saved to .checkmate file
