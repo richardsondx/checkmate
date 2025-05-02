@@ -13,6 +13,7 @@ import * as configCommands from './commands/config.js';
 import * as treeCommands from './commands/tree.js';
 import * as genCommands from './commands/gen.js';
 import * as runCommands from './commands/run.js';
+import * as affectedCommands from './commands/affected.js';
 import * as specs from './lib/specs.js';
 import { Argv } from 'yargs';
 
@@ -186,6 +187,31 @@ yargsInstance
           process.exit(0);
         }
       }
+    }
+  )
+  
+  // Affected command
+  .command(
+    'affected',
+    'Show specs affected by changes', 
+    (yargs: Argv) => {
+      return yargs
+        .option('base', {
+          describe: 'Git diff base (default: origin/main)',
+          type: 'string',
+          default: 'origin/main'
+        })
+        .option('csv', {
+          describe: 'Output as comma-separated list',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      await affectedCommands.printAffectedSpecs(
+        argv.base, 
+        argv.csv ? 'csv' : 'list'
+      );
     }
   )
   

@@ -147,4 +147,33 @@ export function getSpecByName(name: string): string | null {
   }
   
   return null;
+}
+
+/**
+ * Find all specs affected by a list of changed files
+ */
+export function findAffectedSpecs(changedFiles: string[]): string[] {
+  const specFiles = listSpecs();
+  const affectedSpecs: string[] = [];
+  
+  // Convert all changed file paths to absolute paths for consistency
+  const normalizedChangedFiles = changedFiles.map(file => path.resolve(file));
+  
+  for (const specFile of specFiles) {
+    const { files } = parseSpec(specFile);
+    
+    // Check if any of the spec's files match the changed files
+    const isAffected = files.some(specFile => {
+      const normalizedSpecFile = path.resolve(specFile);
+      return normalizedChangedFiles.some(changedFile => 
+        changedFile.includes(normalizedSpecFile) || normalizedSpecFile.includes(changedFile)
+      );
+    });
+    
+    if (isAffected) {
+      affectedSpecs.push(specFile);
+    }
+  }
+  
+  return affectedSpecs;
 } 
