@@ -44,3 +44,12 @@
 ✅ Added functions to list and find specs
 ✅ Command-line interface for 'gen' and 'specs' commands
 ✅ Support for CHECKMATE_EDIT=1 to open editor after generation
+
+## Step 7 - Runner and next
+✅ Created src/lib/executor.ts for running requirement checks
+✅ Implemented executeRequirement() function (currently a stub for demo)
+✅ Added updateSpec() to mark requirements as passed or failed
+✅ Added resetSpec() to reset all requirements to unchecked state
+✅ Implemented logRun() for JSONL history in checkmate/logs/
+✅ Created src/commands/run.ts with run and next commands
+✅ Added run and next commands to CLI with proper options
