@@ -14,7 +14,7 @@ const execAsync = promisify(exec);
 /**
  * Get changed files based on git diff
  */
-async function getChangedFiles(diffBase: string = 'origin/main'): Promise<string[]> {
+async function getChangedFiles(diffBase: string = 'HEAD~'): Promise<string[]> {
   try {
     // Run git diff to get changed files
     const { stdout } = await execAsync(`git diff --name-only ${diffBase}`);
@@ -30,7 +30,7 @@ async function getChangedFiles(diffBase: string = 'origin/main'): Promise<string
 /**
  * Find specs affected by current changes
  */
-export async function findAffectedSpecs(diffBase: string = 'origin/main', outputFormat: 'list' | 'csv' = 'list'): Promise<string[]> {
+export async function findAffectedSpecs(diffBase: string = 'HEAD~', outputFormat: 'list' | 'csv' = 'list'): Promise<string[]> {
   try {
     // Get changed files
     const changedFiles = await getChangedFiles(diffBase);
@@ -55,7 +55,7 @@ export async function findAffectedSpecs(diffBase: string = 'origin/main', output
 /**
  * Find and print specs affected by current changes
  */
-export async function printAffectedSpecs(diffBase: string = 'origin/main', outputFormat: 'list' | 'csv' = 'list'): Promise<void> {
+export async function printAffectedSpecs(diffBase: string = 'HEAD~', outputFormat: 'list' | 'csv' = 'list'): Promise<void> {
   try {
     // Find affected specs
     const affectedSpecs = await findAffectedSpecs(diffBase, outputFormat);

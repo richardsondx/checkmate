@@ -53,3 +53,11 @@
 ✅ Implemented logRun() for JSONL history in checkmate/logs/
 ✅ Created src/commands/run.ts with run and next commands
 ✅ Added run and next commands to CLI with proper options
+
+## Step 8 - Affected list
+✅ Added findAffectedSpecs() in specs.ts to match changed files to specs
+✅ Created src/commands/affected.ts with git diff functionality
+✅ Added support for different diff bases (default: HEAD~)
+✅ Added multiple output formats (list and CSV)
+✅ Support for CM_LIST environment variable for Cursor Rules
+✅ Verified functioning with test changes

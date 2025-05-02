@@ -197,9 +197,9 @@ yargsInstance
     (yargs: Argv) => {
       return yargs
         .option('base', {
-          describe: 'Git diff base (default: origin/main)',
+          describe: 'Git diff base (default: HEAD~)',
           type: 'string',
-          default: 'origin/main'
+          default: 'HEAD~'
         })
         .option('csv', {
           describe: 'Output as comma-separated list',
