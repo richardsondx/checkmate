@@ -10,6 +10,7 @@ import { hideBin } from 'yargs/helpers';
 import { printBanner, printBox } from './ui/banner.js';
 import * as configCommands from './commands/config.js';
 import * as treeCommands from './commands/tree.js';
+import * as genCommands from './commands/gen.js';
 import { Argv } from 'yargs';
 
 // Print the welcome banner
@@ -86,6 +87,26 @@ yargsInstance
       await treeCommands.listDirectories();
     }
   )
+  
+  // Spec commands
+  .command(
+    'gen <description>',
+    'Generate a new spec from a description', 
+    (yargs: Argv) => {
+      return yargs
+        .positional('description', {
+          describe: 'Description of the feature to generate a spec for',
+          type: 'string',
+          demandOption: true
+        });
+    },
+    async (argv: any) => {
+      await genCommands.generateSpec(argv.description);
+    }
+  )
+  .command('specs', 'List all spec files', {}, () => {
+    genCommands.listSpecs();
+  })
   
   // Default command when none is provided
   .command('$0', 'Show help', {}, () => {

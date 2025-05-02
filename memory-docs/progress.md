@@ -35,3 +35,12 @@
 ✅ Filter function for .ts, .js, .tsx, .jsx file extensions
 ✅ Added directory extraction utilities
 ✅ Created CLI commands for listing files and directories
+
+## Step 6 - Spec generator
+✅ Created src/lib/specs.ts for spec generation and parsing
+✅ Implemented slug generation from feature descriptions
+✅ Created generateSpec() to create Markdown files in checkmate/specs/
+✅ Added parseSpec() function to extract requirements from specs
+✅ Added functions to list and find specs
+✅ Command-line interface for 'gen' and 'specs' commands
+✅ Support for CHECKMATE_EDIT=1 to open editor after generation
