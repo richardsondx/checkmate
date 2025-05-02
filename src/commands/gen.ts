@@ -25,8 +25,8 @@ export async function generateSpec(featureDesc: string): Promise<void> {
       console.warn('Warning: No code files found in the project.');
     }
     
-    // Generate the spec
-    const result = specs.generateSpec(featureDesc, files);
+    // Generate the spec - now using await since it's async
+    const result = await specs.generateSpec(featureDesc, files);
     
     console.log(`\nSpec file created at: ${result.path}`);
     

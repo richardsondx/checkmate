@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { load as loadConfig } from './config.js';
+import { callModel } from './models.js';
 
 // Directory where specs are stored
 const SPECS_DIR = 'checkmate/specs';
@@ -29,47 +30,80 @@ export function createSlug(featureDesc: string): string {
 
 /**
  * Create a new spec file from a feature description
- * For now, this creates a simple template with bullet points
- * Later, it will call the AI model to generate content
+ * Uses AI to generate requirements and context
  */
-export function generateSpec(
+export async function generateSpec(
   featureDesc: string, 
   files: string[]
-): { path: string; content: string } {
+): Promise<{ path: string; content: string }> {
+  console.log('Generating AI-driven requirements...');
+  
   // Create slug for the filename
   const slug = createSlug(featureDesc);
   const filePath = path.join(SPECS_DIR, `${slug}.md`);
   
-  // Prepare example bullet points
-  // In a real implementation, these would come from an AI model
-  const bulletPoints = [
-    "Validate input data before processing",
-    "Return appropriate error codes for invalid requests",
-    "Update database with new information",
-    "Send notification on successful completion"
-  ];
+  // Prepare the prompt for the AI model
+  const filesList = files.map(file => `- ${file}`).join('\n');
+  const prompt = `Create a detailed specification for the following feature:
   
-  // Build the markdown content
-  const content = `# Feature: ${featureDesc}
+Feature: ${featureDesc}
+
+The codebase has the following files:
+${filesList}
+
+Generate a markdown document with:
+1. A title based on the feature description
+2. A list of relevant files from the ones listed above that would be involved in implementing this feature
+3. 4-6 specific, testable requirements for this feature (as a checklist with "[ ]" format)
+4. Brief notes with any considerations or implementation details
+
+Return ONLY the markdown content, no explanations or additional text.`;
+
+  // Define the system prompt for the model
+  const systemPrompt = `You are a senior toolsmith specialized in creating software specifications.
+Your task is to create a detailed spec in markdown format, with clear requirements that can be checked programmatically.
+Be specific, actionable, and focus on measurable outcomes.
+Format your response as a valid Markdown document.`;
+
+  try {
+    // Call the AI model to generate the spec content
+    const content = await callModel('reason', systemPrompt, prompt);
+    
+    // Ensure the specs directory exists
+    ensureSpecsDir();
+    
+    // Write the file
+    fs.writeFileSync(filePath, content, 'utf8');
+    
+    return { path: filePath, content };
+  } catch (error) {
+    console.error('Error generating spec with AI:', error);
+    
+    // Fallback to a basic template if AI fails
+    const fallbackContent = `# Feature: ${featureDesc}
 
 ## Files
 ${files.map(file => `- ${file}`).join('\n')}
 
 ## Requirements
-${bulletPoints.map(point => `- [ ] ${point}`).join('\n')}
+- [ ] Validate input data before processing
+- [ ] Return appropriate error codes for invalid requests
+- [ ] Update database with new information
+- [ ] Send notification on successful completion
 
 ## Notes
 - Created: ${new Date().toISOString().split('T')[0]}
 - Status: Draft
 `;
-
-  // Ensure the specs directory exists
-  ensureSpecsDir();
-  
-  // Write the file
-  fs.writeFileSync(filePath, content, 'utf8');
-  
-  return { path: filePath, content };
+    
+    // Ensure the specs directory exists
+    ensureSpecsDir();
+    
+    // Write the fallback file
+    fs.writeFileSync(filePath, fallbackContent, 'utf8');
+    
+    return { path: filePath, content: fallbackContent };
+  }
 }
 
 /**

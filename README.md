@@ -24,24 +24,37 @@ Thought for 13 seconds
 
 # CheckMate
 
-Plain‑English specs that live in Git and block “Done” until every box turns green.  
-Built for Cursor AI, but handy on its own too.
+Plain‑English specs that live in Git and block "Done" until every box turns green.  
+Built for Cursor AI, but handy on its own too.
 
 ---
 
 ## Installation
 
+First, install the package:
+
 ```bash
-npx ts-node -e "import('checkmate').then(m => m.init())"
+npm install checkmateai
+# or
+pnpm add checkmateai
+# or
+yarn add checkmateai
 ```
 
-The script:
+Then initialize CheckMate in your project:
 
-* Drops a `.checkmate` config in the repo root  
+```bash
+npx checkmate init
+```
+
+The init command:
+
+* Creates a `.checkmate` config in the repo root  
 * Adds `checkmate/` and `.checkmate` to `.gitignore`  
 * Creates a starter rules file in `.cursor/config.yaml`
+* Sets up the directory structure for specs, logs and cache
 
-You can start writing specs right away.
+You can start writing specs right away after initialization.
 
 ---
 
@@ -72,22 +85,7 @@ CheckMate resets the boxes, logs the pass, and you move on.
 
 ---
 
-**Updating README with Quick Start**
-
-The user wants me to add a "Quick Start for a cloned repository" section to the README for someone cloning a repo that includes CheckMate. I'll update the README.md with steps like:
-
-1. Clone the repo.
-2. Install dependencies (using pnpm or npm install).
-3. Run `npx checkmate init` if the `.checkmate` file is absent.
-4. Run `checkmate run` to verify the baseline, etc.
-
-This should help guide users who are starting from an existing CheckMate setup.
-
-
-Thought for 7 seconds
-
-
-### Quick Start — when you **clone a repo that already uses CheckMate**
+### Quick Start — when you **clone a repo that already uses CheckMate**
 
 1. **Clone and hop in**
 
@@ -121,9 +119,9 @@ Thought for 7 seconds
 5. **Start coding**
 
    Make a change, commit, and watch the Cursor rules kick off `checkmate affected` → `checkmate run`.
-   Any red box stops the “Done” badge until you push a fix.
+   Any red box stops the "Done" badge until you push a fix.
 
-That’s all—no extra setup, no hidden steps. You clone, install, add your key, and the watchdog is live.
+That's all—no extra setup, no hidden steps. You clone, install, add your key, and the watchdog is live.
 
 
 ---
@@ -155,6 +153,44 @@ When the code appears, future scans catch the real paths.
 
 If the generator points at the wrong file, open the Markdown and fix the `files:` list.  
 CheckMate warns when paths do not exist.
+
+---
+
+## AI Integration
+
+CheckMate uses OpenAI models through a dedicated client to:
+
+1. **Generate Specs** - Convert plain English descriptions into detailed requirements
+2. **Evaluate Requirements** - Test requirements against your code 
+
+Two model tiers handle different tasks:
+
+* **Reason** - For thoughtful spec generation (`gpt-4o` by default)
+* **Quick** - For speedy requirement evaluation (`gpt-4o-mini` by default)
+
+Swapping models takes one line:
+
+```bash
+checkmate model set quick gpt-3.5-turbo
+```
+
+---
+
+## Environment Variables
+
+Add to your `.env` file or set directly in your shell:
+
+```
+OPENAI_API_KEY=sk-...your-key-here...
+```
+
+You can reference this in `.checkmate` with the `env:` prefix:
+
+```yaml
+openai_key: env:OPENAI_API_KEY
+```
+
+This keeps sensitive keys out of your repo.
 
 ---
 
@@ -242,6 +278,125 @@ Logs stream nicely into your dashboard or CI summary.
 ## Contributing
 
 PRs welcome. Keep each change small and include a spec that proves it works.
+
+---
+
+## Cursor Integration (MCP)
+
+CheckMate can be used as a Middleware Control Protocol (MCP) server for Cursor AI, creating a seamless TDD experience directly in your editor.
+
+### Setting Up MCP
+
+The easiest way to set up CheckMate MCP is with the built-in setup command:
+
+```bash
+# Run the automated setup
+npx checkmate setup-mcp
+```
+
+This will create or update your `.cursor/config.json` file with the necessary MCP configuration.
+
+### Manual MCP Setup
+
+If you prefer to set up manually, add this to your `.cursor/config.json`:
+
+```json
+{
+  "mcpServers": {
+    "checkmate": {
+      "command": "node",
+      "args": [
+        "dist/mcp/index.js"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "your-key-here",
+        "CHECKMATE_MODEL_REASON": "o3",
+        "CHECKMATE_MODEL_QUICK": "gpt-4o-mini"
+      }
+    }
+  }
+}
+```
+
+### Using CheckMate with Cursor
+
+Once set up, you can use natural language prompts to drive your TDD workflow:
+
+Just type:
+
+> **"Build a todo list app"**
+
+The CheckMate MCP will:
+- Generate a spec (`checkmate gen`)
+- Let Cursor write code to implement it
+- Run the checklist (`checkmate run`)
+- Block "Done" if any line fails
+
+### Testing Your MCP Setup
+
+Verify your AI configuration with:
+
+```bash
+npx checkmate status
+```
+
+This will test your OpenAI API connection with both models and display the results.
+
+---
+
+## Development
+
+If you want to contribute to CheckMate or debug issues, follow these steps:
+
+### Setup Local Development Environment
+
+1. Clone the repository
+   ```bash
+   git clone https://github.com/yourusername/checkmateai.git
+   cd checkmateai
+   ```
+
+2. Install dependencies
+   ```bash
+   npm install
+   ```
+
+3. Build the TypeScript files
+   ```bash
+   npm run build
+   ```
+
+4. Link the package locally
+   ```bash
+   npm link
+   ```
+
+This will make the `checkmate` command available globally, pointing to your local development version.
+
+### Development Commands
+
+- `npm run dev` - Run the CLI in development mode
+- `npm run build` - Compile TypeScript to JavaScript
+- `npm run checkmate -- <command>` - Run any checkmate command during development
+
+### Debugging
+
+If you encounter any issues with the display of terminal output:
+
+1. Check the console debug logs which should show configurations and other diagnostic information
+2. Try running with the raw TypeScript source: `NODE_OPTIONS="--loader ts-node/esm" ts-node src/index.ts <command>`
+3. Review the logs in the `checkmate/logs` directory for execution details
+
+### Testing AI Integration
+
+Test the AI integration with our test scripts:
+
+```bash
+node test-ai.mjs  # Test direct OpenAI API calls
+node test-config.mjs  # Test config file parsing
+```
+
+Make sure to set up your OpenAI API key in `.checkmate` file before testing.
 
 ---
 

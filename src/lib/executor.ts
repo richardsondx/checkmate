@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { load as loadConfig } from './config.js';
 import * as specs from './specs.js';
+import { callModel } from './models.js';
 
 // Directory for logs
 const LOGS_DIR = 'checkmate/logs';
@@ -23,30 +24,74 @@ function ensureLogsDir(): void {
 }
 
 /**
- * Simple executor for a requirement
- * In a future implementation, this would integrate with real testing
- * For now, it's a stub that always passes (or sometimes fails for demonstration)
+ * Evaluate a requirement using the AI model
  */
 export async function executeRequirement(
   requirement: string, 
   filePath: string
 ): Promise<boolean> {
-  // For demonstration, we'll make requirements pass most of the time
-  // but occasionally fail to show the functionality
-  // In a real implementation, this would actually test the code
-  
-  // Convert to lowercase for consistent comparison
-  const text = requirement.toLowerCase();
-  
-  // Check for keywords that might indicate validation requirements
-  // These will sometimes fail for demo purposes
-  if (text.includes('validate') || text.includes('check') || text.includes('verify')) {
-    // 20% chance of failing
-    return Math.random() > 0.2;
+  try {
+    console.log(`Evaluating requirement: "${requirement}"`);
+    
+    // Get the spec data
+    const specData = specs.parseSpec(filePath);
+    
+    // Get the file paths from the spec
+    const fileList = specData.files;
+    
+    // Gather code samples from the files (limited for demo)
+    let codeContext = '';
+    for (const file of fileList) {
+      try {
+        if (fs.existsSync(file)) {
+          // Read the first 100 lines or so from each file
+          const content = fs.readFileSync(file, 'utf8')
+            .split('\n')
+            .slice(0, 100)
+            .join('\n');
+          
+          codeContext += `\nFile: ${file}\n\`\`\`\n${content}\n\`\`\`\n`;
+        }
+      } catch (error) {
+        // Skip files that can't be read
+        console.warn(`Warning: Could not read file ${file}`);
+      }
+    }
+    
+    // Create a context prompt for the model
+    const contextPrompt = `
+Feature: ${specData.title}
+
+Requirement to evaluate: ${requirement}
+
+Code Context:
+${codeContext.length > 0 ? codeContext : "No code files available for context."}
+
+Please evaluate if the requirement is met by this code.
+Reply with "pass" or "fail" and a brief explanation.
+`;
+
+    // System prompt for the evaluation model
+    const systemPrompt = `You are a strict test evaluator. 
+Your job is to determine if the described requirement has been met based on the code and context.
+Answer with exactly "pass" or "fail" at the start of your response, followed by a brief explanation.
+Be very strict in your evaluation - if there's no clear evidence the requirement is fulfilled, fail it.
+`;
+
+    // Call the model
+    const response = await callModel('quick', systemPrompt, contextPrompt);
+    
+    // Parse the response
+    const isPassing = response.toLowerCase().trim().startsWith('pass');
+    
+    console.log(`Evaluation result: ${isPassing ? 'PASS' : 'FAIL'}`);
+    return isPassing;
+  } catch (error) {
+    console.error('Error evaluating requirement:', error);
+    
+    // In case of failure, return false to be safe
+    return false;
   }
-  
-  // Success by default for demo
-  return true;
 }
 
 /**

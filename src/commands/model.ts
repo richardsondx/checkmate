@@ -42,16 +42,36 @@ export function setModel(slot: 'reason' | 'quick', modelName: string): void {
  * Print detailed information about models
  */
 export function printModelInfo(): void {
+  const config = loadConfig();
+  
   console.log(chalk.cyan('\nModel Slots:'));
   console.log(chalk.gray('─'.repeat(60)));
   
   console.log(`${chalk.bold('reason')} - Used for generating detailed specs from descriptions`);
+  console.log(`  Current: ${chalk.green(config.models.reason)}`);
   console.log(`  Recommended: GPT-4o or GPT-4`);
   console.log(`  This model needs strong reasoning capabilities to create specs.`);
   
   console.log(`\n${chalk.bold('quick')} - Used for fast checks during test runs`);
+  console.log(`  Current: ${chalk.green(config.models.quick)}`);
   console.log(`  Recommended: GPT-4o-mini or GPT-3.5-turbo`);
   console.log(`  This model handles pass/fail decisions during test execution.`);
   
   console.log(chalk.gray('─'.repeat(60)));
+  
+  // Display API key status
+  const apiKey = config.openai_key || '';
+  const hasKey = apiKey && apiKey.length > 0;
+  const keyStatus = hasKey 
+    ? chalk.green('✓ API key is configured') 
+    : chalk.red('✗ No API key found');
+    
+  console.log(`\nAPI Key: ${keyStatus}`);
+  
+  if (!hasKey) {
+    console.log(chalk.yellow('\nTo set an API key, add to your .checkmate file:'));
+    console.log(chalk.gray('openai_key: "sk-..."'));
+    console.log(chalk.yellow('\nOr use an environment variable:'));
+    console.log(chalk.gray('openai_key: "env:OPENAI_API_KEY"'));
+  }
 } 

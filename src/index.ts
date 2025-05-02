@@ -1,4 +1,4 @@
-#!/usr/bin/env ts-node
+#!/usr/bin/env node
 
 /**
  * CheckMate CLI
@@ -220,6 +220,20 @@ yargsInstance
   // Watch command
   .command('watch', 'Start a live dashboard that monitors test runs', {}, async () => {
     await watchCommands.watch();
+  })
+  
+  // Status command to test AI integration
+  .command('status', 'Test the AI model integration', {}, async () => {
+    // Import dynamically to avoid circular dependencies
+    const statusModule = await import('./commands/status.js');
+    // The status module has a self-executing function
+  })
+  
+  // Setup MCP command
+  .command('setup-mcp', 'Set up CheckMate as a Cursor MCP server', {}, async () => {
+    // Import dynamically to avoid circular dependencies
+    const setupModule = await import('./commands/setup-mcp.js');
+    // The setup module has a self-executing function
   })
   
   // Model commands - using a command with subcommands approach

@@ -77,3 +77,30 @@
 ✅ Implemented `checkmate model set <slot> <name>` to set models
 ✅ Added subcommand structure to CLI parser
 ✅ Verified model changes are saved to .checkmate file
+
+## Patch – Vercel AI SDK Integration
+✅ Added 'ai' and 'openai' packages
+✅ Created models.ts wrapper with OpenAI client integration
+✅ Updated specs.ts to use callModel("reason") for spec generation
+✅ Executor now uses callModel("quick") for requirement evaluation
+✅ Added environment variable support with env: prefix in config
+✅ Updated README with AI integration documentation
+✅ Added documentation for model swapping and API keys
+
+## Fixes and Improvements
+✅ Fixed init command to create directories and update .gitignore
+✅ Updated README with correct installation and usage instructions
+✅ Added proper shebang line to index.ts for compiled version
+✅ Added bin field to package.json for CLI direct usage
+✅ Removed debug logging from config loading
+✅ Added development documentation
+✅ Verified CLI works correctly as a globally linked package
+
+## Cursor MCP Integration
+✅ Created MCP server entry point in src/mcp/index.ts
+✅ Implemented MCP event router in src/mcp/router.ts
+✅ Added 'status' command to test AI model integration
+✅ Created 'setup-mcp' command to generate .cursor/config.json
+✅ Added MCP configuration to package.json
+✅ Updated README with MCP setup and usage instructions
+✅ Added binary references for global commands

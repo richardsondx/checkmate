@@ -1,14 +1,32 @@
 {
   "name": "checkmateai",
   "version": "1.0.0",
-  "description": "**Writing README.md guidelines**",
-  "main": "index.js",
+  "description": "Plain-English specs that live in Git and block 'Done' until every box turns green",
+  "main": "dist/index.js",
   "type": "module",
+  "bin": {
+    "checkmate": "dist/index.js",
+    "checkmate-mcp": "src/mcp/index.ts"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "checkmate": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts"
+    "build": "tsc",
+    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts",
+    "checkmate": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts",
+    "status": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/commands/status.ts",
+    "mcp": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/mcp/index.ts",
+    "setup-mcp": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/commands/setup-mcp.ts",
+    "prepare": "npm run build"
   },
-  "keywords": [],
+  "keywords": [
+    "tdd",
+    "testing",
+    "ai",
+    "specs",
+    "markdown",
+    "cursor",
+    "mcp"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
@@ -23,5 +41,9 @@
     "typescript": "^5.8.3",
     "yaml": "^2.7.1",
     "yargs": "^17.7.2"
+  },
+  "dependencies": {
+    "ai": "^2.2.34",
+    "openai": "^4.29.0"
   }
 }

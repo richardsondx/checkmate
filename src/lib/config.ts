@@ -39,17 +39,24 @@ export function load(): CheckMateConfig {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const fileContent = fs.readFileSync(CONFIG_FILE, 'utf8');
-      const parsedConfig = parse(fileContent);
       
-      // Merge with defaults to ensure all fields exist
-      return {
-        ...DEFAULT_CONFIG,
-        ...parsedConfig,
-        models: {
-          ...DEFAULT_CONFIG.models,
-          ...(parsedConfig.models || {}),
-        },
-      };
+      try {
+        const parsedConfig = parse(fileContent);
+        
+        // Merge with defaults to ensure all fields exist
+        return {
+          ...DEFAULT_CONFIG,
+          ...parsedConfig,
+          models: {
+            ...DEFAULT_CONFIG.models,
+            ...(parsedConfig.models || {}),
+          },
+        };
+      } catch (parseError) {
+        console.error('Error parsing YAML config:', parseError);
+        console.log('Using default configuration instead.');
+        return { ...DEFAULT_CONFIG };
+      }
     }
   } catch (error) {
     console.error('Error loading config:', error);

@@ -1,0 +1,112 @@
+#!/usr/bin/env ts-node
+
+/**
+ * CheckMate MCP Setup Command
+ * Sets up Cursor integration by creating/updating .cursor/config.json
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { load as loadConfig } from '../lib/config.js';
+import { printBox } from '../ui/banner.js';
+import chalk from 'chalk';
+
+const CURSOR_CONFIG_DIR = '.cursor';
+const CURSOR_CONFIG_FILE = path.join(CURSOR_CONFIG_DIR, 'config.json');
+
+// Define types for the configuration
+interface MCPServerConfig {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}
+
+interface MCPConfig {
+  mcpServers?: Record<string, MCPServerConfig>;
+  [key: string]: any;
+}
+
+async function setupMcp() {
+  console.log(chalk.cyan('🔧 Setting up CheckMate MCP for Cursor...'));
+  
+  // Ensure .cursor directory exists
+  if (!fs.existsSync(CURSOR_CONFIG_DIR)) {
+    fs.mkdirSync(CURSOR_CONFIG_DIR, { recursive: true });
+    console.log(chalk.green(`✅ Created ${CURSOR_CONFIG_DIR} directory`));
+  }
+  
+  // Load CheckMate config to get API key if available
+  const checkmateConfig = loadConfig();
+  
+  // Get API key from CheckMate config
+  const apiKey = checkmateConfig.openai_key || 'your-key-here';
+  
+  // Get model names from CheckMate config
+  const reasonModel = checkmateConfig.models.reason;
+  const quickModel = checkmateConfig.models.quick;
+  
+  // Create MCP configuration
+  const mcpConfig: MCPConfig = {
+    mcpServers: {
+      checkmate: {
+        command: 'node',
+        args: [
+          'dist/mcp/index.js'
+        ],
+        env: {
+          OPENAI_API_KEY: apiKey,
+          CHECKMATE_MODEL_REASON: reasonModel,
+          CHECKMATE_MODEL_QUICK: quickModel
+        }
+      }
+    }
+  };
+  
+  // Check if config file already exists
+  let existingConfig: MCPConfig = {};
+  if (fs.existsSync(CURSOR_CONFIG_FILE)) {
+    try {
+      const configContent = fs.readFileSync(CURSOR_CONFIG_FILE, 'utf8');
+      existingConfig = JSON.parse(configContent) as MCPConfig;
+      console.log(chalk.yellow('⚠️ Existing Cursor config found, merging with new settings...'));
+    } catch (error) {
+      console.warn(chalk.yellow(`⚠️ Error reading existing config: ${error}`));
+      console.log(chalk.yellow('Creating new config file...'));
+    }
+  }
+  
+  // Merge with existing config
+  const newConfig: MCPConfig = {
+    ...existingConfig,
+    mcpServers: {
+      ...(existingConfig.mcpServers || {}),
+      ...mcpConfig.mcpServers
+    }
+  };
+  
+  // Write the config file
+  fs.writeFileSync(
+    CURSOR_CONFIG_FILE,
+    JSON.stringify(newConfig, null, 2),
+    'utf8'
+  );
+  
+  console.log(chalk.green(`✅ Updated ${CURSOR_CONFIG_FILE} with CheckMate MCP configuration`));
+  
+  // Display success message
+  printBox(`
+🎉 CheckMate MCP Setup Complete!
+
+${chalk.cyan(CURSOR_CONFIG_FILE)} has been configured for CheckMate.
+
+To use with Cursor:
+1. Restart Cursor
+2. Type ${chalk.cyan('"Build a todo list app"')} in a prompt
+3. The MCP will generate specs and run checks automatically
+
+Try ${chalk.cyan('npm run status')} to verify your AI configuration.
+`);
+}
+
+// Run the setup
+setupMcp(); 
