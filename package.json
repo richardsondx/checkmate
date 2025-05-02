@@ -1,0 +1,25 @@
+{
+  "name": "checkmateai",
+  "version": "1.0.0",
+  "description": "**Writing README.md guidelines**",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "checkmate": "ts-node src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "boxen": "^8.0.1",
+    "chalk": "^5.4.1",
+    "chokidar": "^4.0.3",
+    "execa": "^9.5.2",
+    "inquirer": "^12.6.0",
+    "simple-git": "^3.27.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "yaml": "^2.7.1",
+    "yargs": "^17.7.2"
+  }
+}
