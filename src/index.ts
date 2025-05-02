@@ -9,6 +9,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { printBanner, printBox } from './ui/banner.js';
 import * as configCommands from './commands/config.js';
+import * as treeCommands from './commands/tree.js';
 import { Argv } from 'yargs';
 
 // Print the welcome banner
@@ -63,6 +64,26 @@ yargsInstance
     }, 
     (argv: any) => {
       configCommands.setLogMode(argv.mode as 'on' | 'off' | 'optional');
+    }
+  )
+  
+  // Tree commands
+  .command('files', 'List all code files in the project', 
+    (yargs: Argv) => {
+      return yargs
+        .option('ext', {
+          describe: 'File extensions to include',
+          type: 'array',
+          default: ['ts', 'js', 'tsx', 'jsx']
+        });
+    },
+    async (argv: any) => {
+      await treeCommands.listFiles(argv.ext);
+    }
+  )
+  .command('dirs', 'List directories containing code files', {}, 
+    async () => {
+      await treeCommands.listDirectories();
     }
   )
   

@@ -27,3 +27,11 @@
 ✅ Added setLogMode() for log flag control
 ✅ Created CLI commands for config management
 ✅ Added yargs command handling in index.ts
+
+## Step 5 - Tree scanner
+✅ Created src/lib/tree.ts with file scanning functionality
+✅ Added git ls-files as primary command
+✅ Added find command as fallback when git not initialized
+✅ Filter function for .ts, .js, .tsx, .jsx file extensions
+✅ Added directory extraction utilities
+✅ Created CLI commands for listing files and directories
