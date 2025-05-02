@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/yargs": "^17.0.33",
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
     "chokidar": "^4.0.3",

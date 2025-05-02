@@ -19,3 +19,11 @@
 ✅ Added ASCII art and helper messages
 ✅ Updated src/index.ts to call printBanner()
 ✅ Updated project to use ESM modules for compatibility with chalk and boxen
+
+## Step 4 - Config handling
+✅ Created src/lib/config.ts with load() and save() functions
+✅ Config uses default values when .checkmate file is missing
+✅ Added updateModel() for model slot changes
+✅ Added setLogMode() for log flag control
+✅ Created CLI commands for config management
+✅ Added yargs command handling in index.ts
