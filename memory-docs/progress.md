@@ -61,3 +61,11 @@
 ✅ Added multiple output formats (list and CSV)
 ✅ Support for CM_LIST environment variable for Cursor Rules
 ✅ Verified functioning with test changes
+
+## Step 9 - Watch dashboard
+✅ Created src/commands/watch.ts for a live dashboard
+✅ Used chokidar to watch the run.log file for changes
+✅ Implemented a clean tabular display with chalk formatting
+✅ Added auto-updating when new log entries are detected
+✅ Display shows pass/fail status with colored indicators
+✅ Clear terminal and redraw for a smooth live dashboard experience

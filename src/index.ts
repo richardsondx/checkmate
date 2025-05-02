@@ -14,6 +14,7 @@ import * as treeCommands from './commands/tree.js';
 import * as genCommands from './commands/gen.js';
 import * as runCommands from './commands/run.js';
 import * as affectedCommands from './commands/affected.js';
+import * as watchCommands from './commands/watch.js';
 import * as specs from './lib/specs.js';
 import { Argv } from 'yargs';
 
@@ -214,6 +215,11 @@ yargsInstance
       );
     }
   )
+  
+  // Watch command
+  .command('watch', 'Start a live dashboard that monitors test runs', {}, async () => {
+    await watchCommands.watch();
+  })
   
   // Default command when none is provided
   .command('$0', 'Show help', {}, () => {
