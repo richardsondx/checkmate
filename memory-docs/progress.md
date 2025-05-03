@@ -1,106 +1,129 @@
-# CheckMate Implementation Progress
+# CheckMate CLI Improvements Progress Log
 
-## Step 1 - Scaffold
-✅ npm init -y ran successfully
-✅ tsconfig.json created with ES2022 and moduleResolution: node16
-✅ Dependencies installed: ts-node, typescript, chalk, yargs, boxen, execa, inquirer, chokidar, simple-git, yaml
-✅ Added script: "checkmate": "ts-node src/index.ts"
-✅ Basic index.ts file created
+## Overview
 
-## Step 2 - Core folders
-✅ Created src/commands/ and src/lib/ directories
-✅ Added checkmate/specs, checkmate/logs, checkmate/cache directories
-✅ Already included checkmate/** and .checkmate in .gitignore
-✅ Added placeholder files and directory documentation
+This document tracks the improvements made to the CheckMate CLI to enable reliable conversion of natural language feature requests into actionable specs with testable checklists.
 
-## Step 3 - ASCII splash + welcome box
-✅ Created src/ui/banner.ts
-✅ Implemented printBanner() function using boxen and chalk
-✅ Added ASCII art and helper messages
-✅ Updated src/index.ts to call printBanner()
-✅ Updated project to use ESM modules for compatibility with chalk and boxen
+## Implemented Changes
 
-## Step 4 - Config handling
-✅ Created src/lib/config.ts with load() and save() functions
-✅ Config uses default values when .checkmate file is missing
-✅ Added updateModel() for model slot changes
-✅ Added setLogMode() for log flag control
-✅ Created CLI commands for config management
-✅ Added yargs command handling in index.ts
+### 1. Core Pipeline Upgrades
 
-## Step 5 - Tree scanner
-✅ Created src/lib/tree.ts with file scanning functionality
-✅ Added git ls-files as primary command
-✅ Added find command as fallback when git not initialized
-✅ Filter function for .ts, .js, .tsx, .jsx file extensions
-✅ Added directory extraction utilities
-✅ Created CLI commands for listing files and directories
+- **Feature Splitter (src/lib/splitter.ts)**
+  - Implemented a reasoning model-based feature splitter that breaks down complex requirements into distinct atomic features
+  - Each feature has title, slug, and description properties
+  - Added JSON parsing with fallback extraction for reliable model response processing
+  - Wrote unit test in test-splitter.mjs
 
-## Step 6 - Spec generator
-✅ Created src/lib/specs.ts for spec generation and parsing
-✅ Implemented slug generation from feature descriptions
-✅ Created generateSpec() to create Markdown files in checkmate/specs/
-✅ Added parseSpec() function to extract requirements from specs
-✅ Added functions to list and find specs
-✅ Command-line interface for 'gen' and 'specs' commands
-✅ Support for CHECKMATE_EDIT=1 to open editor after generation
+- **Context Builder (src/lib/context.ts)**
+  - Created an intelligent file ranking system that finds files relevant to each feature
+  - Implemented TF-IDF style keyword matching for better relevance scoring
+  - Added support for scanning all files or just code files (--all-files flag)
+  - Includes reasons for each file's relevance to aid spec creation
 
-## Step 7 - Runner and next
-✅ Created src/lib/executor.ts for running requirement checks
-✅ Implemented executeRequirement() function (currently a stub for demo)
-✅ Added updateSpec() to mark requirements as passed or failed
-✅ Added resetSpec() to reset all requirements to unchecked state
-✅ Implemented logRun() for JSONL history in checkmate/logs/
-✅ Created src/commands/run.ts with run and next commands
-✅ Added run and next commands to CLI with proper options
+- **Spec Author (src/lib/specAuthor.ts)**
+  - Implemented improved spec generation with detailed, testable requirements
+  - Added support for additional context/notes from PRD or other sources
+  - Created a structured output format with files section and steps checklist
+  - Added "needsMoreContext" flag to indicate when more information would help
 
-## Step 8 - Affected list
-✅ Added findAffectedSpecs() in specs.ts to match changed files to specs
-✅ Created src/commands/affected.ts with git diff functionality
-✅ Added support for different diff bases (default: HEAD~)
-✅ Added multiple output formats (list and CSV)
-✅ Support for CM_LIST environment variable for Cursor Rules
-✅ Verified functioning with test changes
+### 2. Command Enhancements
 
-## Step 9 - Watch dashboard
-✅ Created src/commands/watch.ts for a live dashboard
-✅ Used chokidar to watch the run.log file for changes
-✅ Implemented a clean tabular display with chalk formatting
-✅ Added auto-updating when new log entries are detected
-✅ Display shows pass/fail status with colored indicators
-✅ Clear terminal and redraw for a smooth live dashboard experience
+- **Generate Command (src/commands/gen.ts)**
+  - Updated to use the new pipeline components
+  - Added visual feedback with spinner during model reasoning
+  - Shows clear progress for multi-feature generation
+  - Maintains backward compatibility with existing CLI usage
 
-## Step 10 - Model commands
-✅ Created src/commands/model.ts for model management
-✅ Implemented `checkmate model list` to show configured models
-✅ Implemented `checkmate model info` to show detailed model info
-✅ Implemented `checkmate model set <slot> <name>` to set models
-✅ Added subcommand structure to CLI parser
-✅ Verified model changes are saved to .checkmate file
+- **Create Command (src/commands/create.ts)**
+  - Added new command for integration with external tools
+  - Supports JSON payload input (--json) with feature, files, and notes
+  - Supports PRD file input (--prd) to extract multiple features
+  - Added spec update functionality (--update) to refresh existing specs
 
-## Patch – Vercel AI SDK Integration
-✅ Added 'ai' and 'openai' packages
-✅ Created models.ts wrapper with OpenAI client integration
-✅ Updated specs.ts to use callModel("reason") for spec generation
-✅ Executor now uses callModel("quick") for requirement evaluation
-✅ Added environment variable support with env: prefix in config
-✅ Updated README with AI integration documentation
-✅ Added documentation for model swapping and API keys
+- **Affected Command (src/commands/affected.ts)**
+  - Added Git-optional file difference tracking
+  - Implemented filesystem snapshot-based change detection
+  - Added JSON output option for programmatic use
+  - Supports diffing against specific Git bases or latest snapshot
 
-## Fixes and Improvements
-✅ Fixed init command to create directories and update .gitignore
-✅ Updated README with correct installation and usage instructions
-✅ Added proper shebang line to index.ts for compiled version
-✅ Added bin field to package.json for CLI direct usage
-✅ Removed debug logging from config loading
-✅ Added development documentation
-✅ Verified CLI works correctly as a globally linked package
+### 3. Git-Optional Infrastructure
 
-## Cursor MCP Integration
-✅ Created MCP server entry point in src/mcp/index.ts
-✅ Implemented MCP event router in src/mcp/router.ts
-✅ Added 'status' command to test AI model integration
-✅ Created 'setup-mcp' command to generate .cursor/config.json
-✅ Added MCP configuration to package.json
-✅ Updated README with MCP setup and usage instructions
-✅ Added binary references for global commands
+- **File Tree Utilities (src/lib/tree.ts)**
+  - Added Git-optional file scanning and change detection
+  - Implemented file snapshot system with MD5 hashing
+  - Created `.checkmate/snap.json` for tracking file changes
+  - Improved file matching for spec dependencies
+
+### 4. Configuration
+
+- **Config Handling (src/lib/config.ts)**
+  - Added new configuration options:
+    - `context_top_n`: Maximum number of files to include in context (default: 40)
+    - `show_thinking`: Whether to show model reasoning spinner (default: true)
+  - Updated default model settings to use GPT-4o
+
+### 5. Cursor Integration
+
+- **Helper Script (scripts/cursor-checkmate.js)**
+  - Created a helper script for easy invocation from Cursor
+  - Allows passing feature description and specific files
+  - Forwards to the new create command with JSON payload
+
+- **README Updates**
+  - Added documentation for working with Cursor
+  - Included examples of one-off spec creation
+  - Added guidance on using affected specs with JSON output
+
+### 6. Dependency Updates
+
+- Added support for:
+  - `ora` for spinner/progress indicators
+  - `chalk` for colorized output
+  - `fast-glob` for efficient file scanning
+  - `string-similarity` for relevance ranking
+  - `tsx` for TypeScript execution
+
+## Testing Results
+
+The implementation successfully:
+- Splits complex requirements like "Find by Issues and by Repositories" into distinct features
+- Ranks files by relevance to each feature
+- Generates detailed, testable specifications
+- Works with or without Git for file tracking
+- Shows clear progress with visual feedback
+- Integrates cleanly with Cursor through multiple methods
+
+## Production Readiness Notes
+
+For full production deployment, the following issues need to be addressed:
+
+1. **API Parameter Fix**: The OpenAI API parameters need to be updated for newer models:
+   - We discovered during testing that newer models like GPT-4o require `max_completion_tokens` instead of `max_tokens`
+   - This change has been implemented but would need thorough testing with a valid API key
+
+2. **Error Handling**: 
+   - Add more robust error handling for cases where:
+     - OpenAI API is unavailable
+     - The model doesn't generate valid JSON
+     - Files cannot be read or written
+
+3. **Rate Limiting**:
+   - Implement rate limiting and retry logic for API calls
+   - Add queueing for large batches of spec generations
+
+4. **Testing Coverage**:
+   - Expand test suite to cover:
+     - All new components
+     - Integration between components
+     - Edge cases with various input types
+
+5. **Performance Optimization**:
+   - For larger codebases, optimize the context builder to use more efficient file scanning
+   - Consider implementing caching for file contents to speed up relevance scoring
+
+## Next Steps
+
+- **Additional Testing**: Test with larger repositories to ensure performance
+- **CI Integration**: Add GitHub Actions workflow for spec validation
+- **UI Improvements**: Consider a web UI for spec visualization
+- **PRD Integration**: Enhance PRD parsing to extract more structured requirements

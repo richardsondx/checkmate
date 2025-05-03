@@ -15,6 +15,7 @@ import * as genCommands from './commands/gen.js';
 import * as runCommands from './commands/run.js';
 import * as affectedCommands from './commands/affected.js';
 import * as watchCommands from './commands/watch.js';
+import * as createCommands from './commands/create.js';
 import * as specs from './lib/specs.js';
 import { Argv } from 'yargs';
 import * as modelCommands from './commands/model.js';
@@ -37,7 +38,7 @@ yargsInstance
     configCommands.show();
   })
   .command(
-    'model set <slot> <name>',
+    'model set <slot> <n>',
     'Set model for a specific slot', 
     (yargs: Argv) => {
       return yargs
@@ -55,6 +56,21 @@ yargsInstance
     }, 
     (argv: any) => {
       configCommands.setModel(argv.slot as 'reason' | 'quick', argv.name);
+    }
+  )
+  .command(
+    'set-anthropic-key <key>',
+    'Set Anthropic API key for Claude models', 
+    (yargs: Argv) => {
+      return yargs
+        .positional('key', {
+          describe: 'Anthropic API key or env:VARIABLE_NAME reference',
+          type: 'string',
+          demandOption: true
+        });
+    }, 
+    (argv: any) => {
+      configCommands.setAnthropicKey(argv.key);
     }
   )
   .command(
@@ -104,15 +120,57 @@ yargsInstance
           describe: 'Description of the feature to generate a spec for',
           type: 'string',
           demandOption: true
+        })
+        .option('all-files', {
+          describe: 'Scan all file types, not just code files',
+          type: 'boolean',
+          default: false
         });
     },
     async (argv: any) => {
-      await genCommands.generateSpec(argv.description);
+      await genCommands.generateSpec(argv.description, {
+        allFiles: argv.allFiles
+      });
     }
   )
   .command('specs', 'List all spec files', {}, () => {
     genCommands.listSpecs();
   })
+  
+  // Create command (new)
+  .command(
+    'create',
+    'Create a spec from JSON payload or PRD file',
+    (yargs: Argv) => {
+      return yargs
+        .option('json', {
+          describe: 'JSON payload with feature description and optional files',
+          type: 'string'
+        })
+        .option('prd', {
+          describe: 'Path to a markdown PRD file to extract features from',
+          type: 'string'
+        })
+        .option('update', {
+          describe: 'Update an existing spec by slug',
+          type: 'string'
+        })
+        .check((argv) => {
+          const hasOptions = argv.json || argv.prd || argv.update;
+          if (!hasOptions) {
+            throw new Error('One of --json, --prd, or --update is required');
+          }
+          return true;
+        });
+    },
+    async (argv: any) => {
+      await createCommands.handleCreate({
+        json: argv.json,
+        prd: argv.prd,
+        update: argv.update
+      });
+    }
+  )
   
   // Run commands
   .command(
@@ -199,21 +257,20 @@ yargsInstance
     (yargs: Argv) => {
       return yargs
         .option('base', {
-          describe: 'Git diff base (default: HEAD~)',
-          type: 'string',
-          default: 'HEAD~'
+          describe: 'Git diff base (default: HEAD if in git repo)',
+          type: 'string'
         })
-        .option('csv', {
-          describe: 'Output as comma-separated list',
+        .option('json', {
+          describe: 'Output as JSON array of spec slugs',
           type: 'boolean',
           default: false
         });
     },
     async (argv: any) => {
-      await affectedCommands.printAffectedSpecs(
-        argv.base, 
-        argv.csv ? 'csv' : 'list'
-      );
+      await affectedCommands.findAffectedSpecs({
+        base: argv.base,
+        json: argv.json
+      });
     }
   )
   
@@ -257,7 +314,7 @@ yargsInstance
           }
         })
         .command({
-          command: 'set <slot> <name>',
+          command: 'set <slot> <n>',
           describe: 'Set a model for a specific slot',
           builder: (yargs: Argv) => {
             return yargs

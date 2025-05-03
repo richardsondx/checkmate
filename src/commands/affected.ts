@@ -1,87 +1,133 @@
 /**
- * Affected specs commands for CheckMate CLI
- * Identifies specs affected by code changes
+ * Affected specs command for CheckMate CLI
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
-import * as specs from '../lib/specs.js';
-import { load as loadConfig } from '../lib/config.js';
-
-const execAsync = promisify(exec);
+import * as tree from '../lib/tree.js';
+import { printBox } from '../ui/banner.js';
 
 /**
- * Get changed files based on git diff
+ * Find specs affected by changes
  */
-async function getChangedFiles(diffBase: string = 'HEAD~'): Promise<string[]> {
+export async function findAffectedSpecs(args: { json?: boolean, base?: string }): Promise<void> {
   try {
-    // Run git diff to get changed files
-    const { stdout } = await execAsync(`git diff --name-only ${diffBase}`);
+    console.log('Finding affected specs...');
     
-    // Return array of changed file paths
-    return stdout.trim().split('\n').filter(Boolean);
-  } catch (error) {
-    console.error('Error getting changed files:', error);
-    return [];
-  }
-}
-
-/**
- * Find specs affected by current changes
- */
-export async function findAffectedSpecs(diffBase: string = 'HEAD~', outputFormat: 'list' | 'csv' = 'list'): Promise<string[]> {
-  try {
     // Get changed files
-    const changedFiles = await getChangedFiles(diffBase);
+    const changedFiles = await tree.getChangedFiles(args.base);
     
-    // If no files changed, return empty result
+    console.log(`Found ${changedFiles.length} changed files`);
+    
     if (changedFiles.length === 0) {
-      console.log('No files changed.');
-      return [];
-    }
-    
-    // Find affected specs
-    const affectedSpecs = specs.findAffectedSpecs(changedFiles);
-    
-    // Return affected specs
-    return affectedSpecs;
-  } catch (error) {
-    console.error('Error finding affected specs:', error);
-    return [];
-  }
-}
-
-/**
- * Find and print specs affected by current changes
- */
-export async function printAffectedSpecs(diffBase: string = 'HEAD~', outputFormat: 'list' | 'csv' = 'list'): Promise<void> {
-  try {
-    // Find affected specs
-    const affectedSpecs = await findAffectedSpecs(diffBase, outputFormat);
-    
-    // If no specs affected, print message
-    if (affectedSpecs.length === 0) {
-      console.log('No specs affected by changes.');
+      console.log('No changed files found.');
       return;
     }
     
-    // Format spec names (show basename only)
-    const specNames = affectedSpecs.map(specPath => path.basename(specPath, '.md'));
+    // Find all spec files
+    const specsDir = 'checkmate/specs';
+    if (!fs.existsSync(specsDir)) {
+      console.log('No specs directory found. Generate specs with "checkmate gen".');
+      return;
+    }
     
-    // Print results in requested format
-    if (outputFormat === 'csv') {
-      console.log(specNames.join(','));
+    const allSpecFiles = fs.readdirSync(specsDir)
+      .filter(file => file.endsWith('.md'))
+      .map(file => path.join(specsDir, file));
+    
+    if (allSpecFiles.length === 0) {
+      console.log('No spec files found. Generate specs with "checkmate gen".');
+      return;
+    }
+    
+    // Find affected specs by parsing each spec and checking for file matches
+    const affectedSpecs: {
+      path: string;
+      slug: string;
+      title: string;
+    }[] = [];
+    
+    for (const specPath of allSpecFiles) {
+      const { affected, slug, title } = isSpecAffected(specPath, changedFiles);
+      
+      if (affected) {
+        affectedSpecs.push({ path: specPath, slug, title });
+      }
+    }
+    
+    // Output results
+    if (args.json) {
+      // JSON output (just slugs)
+      const slugs = affectedSpecs.map(spec => spec.slug);
+      console.log(JSON.stringify(slugs));
     } else {
-      console.log(`\nFound ${affectedSpecs.length} affected specs:`);
-      specNames.forEach(spec => console.log(`- ${spec}`));
+      // Human-readable output
+      if (affectedSpecs.length === 0) {
+        console.log('No specs affected by these changes.');
+      } else {
+        console.log(`\nFound ${affectedSpecs.length} affected specs:`);
+        
+        affectedSpecs.forEach(spec => {
+          console.log(`- ${spec.title} (${spec.slug})`);
+        });
+        
+        printBox(`Run 'checkmate run <slug>' to verify any of these specs against your changes`);
+      }
     }
     
-    // Set environment variable if CM_LIST is set
-    if (process.env.CM_LIST) {
-      process.env[process.env.CM_LIST] = specNames.join(',');
-    }
   } catch (error) {
-    console.error('Error printing affected specs:', error);
+    console.error('Error finding affected specs:', error);
+  }
+}
+
+/**
+ * Check if a spec is affected by changed files
+ */
+function isSpecAffected(specPath: string, changedFiles: string[]): { 
+  affected: boolean; 
+  slug: string;
+  title: string;
+} {
+  try {
+    // Read spec file
+    const content = fs.readFileSync(specPath, 'utf8');
+    
+    // Extract slug from filename
+    const slug = path.basename(specPath, '.md');
+    
+    // Extract title
+    const titleMatch = content.match(/# Feature: (.*?)(?=\n|$)/);
+    const title = titleMatch ? titleMatch[1].trim() : slug;
+    
+    // Extract file paths from the spec
+    const fileSection = content.match(/files:\s*\n((?:- .*?\n)*)/);
+    
+    if (!fileSection) {
+      return { affected: false, slug, title };
+    }
+    
+    const specFiles = fileSection[1]
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('- '))
+      .map(line => line.substring(2).trim());
+    
+    // Check if any of the changed files match files mentioned in the spec
+    const isAffected = specFiles.some(specFile => {
+      return changedFiles.some(changedFile => {
+        // Normalize paths for comparison
+        const normalizedSpecFile = path.normalize(specFile);
+        const normalizedChangedFile = path.normalize(changedFile);
+        
+        // Check for exact match or if changed file is within a directory mentioned in spec
+        return normalizedChangedFile === normalizedSpecFile || 
+               normalizedChangedFile.startsWith(normalizedSpecFile + path.sep) ||
+               normalizedSpecFile.includes(normalizedChangedFile);
+      });
+    });
+    
+    return { affected: isAffected, slug, title };
+  } catch (error) {
+    console.error(`Error checking spec ${specPath}:`, error);
+    return { affected: false, slug: path.basename(specPath, '.md'), title: path.basename(specPath, '.md') };
   }
 } 

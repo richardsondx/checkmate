@@ -296,6 +296,40 @@ npx checkmate setup-mcp
 
 This will create or update your `.cursor/config.json` file with the necessary MCP configuration.
 
+### Working with Cursor
+
+You can integrate CheckMate directly into your Cursor workflow using several approaches:
+
+#### Using the Cursor one-off spec helper
+
+The simplest way to create a spec from Cursor is to use the included helper script:
+
+```bash
+node scripts/cursor-checkmate.js \
+  "Search developers endpoint" \
+  app/api/github/search/route.ts app/lead-finder/search/page.js
+```
+
+This creates a specification with the given feature description and explicitly lists the files that will be touched.
+
+#### Using checkmate create directly
+
+For more complex integrations, use the `create` command with JSON:
+
+```bash
+checkmate create --json '{"feature": "Add webhook support", "files": ["src/api/webhooks/**"]}'
+```
+
+#### Using affected specs
+
+When you make changes to files, find all impacted specs with:
+
+```bash
+checkmate affected --json
+```
+
+This returns a JSON array of spec slugs that your current changes might impact.
+
 ### Manual MCP Setup
 
 If you prefer to set up manually, add this to your `.cursor/config.json`:

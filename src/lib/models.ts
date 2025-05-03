@@ -1,8 +1,9 @@
 /**
  * AI Model integration for CheckMate CLI
- * Uses the Vercel AI SDK to interact with language models
+ * Supports both OpenAI and Anthropic models
  */
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { load as loadConfig } from './config.js';
 import * as fs from 'node:fs';
 import * as dotenv from 'node:process';
@@ -31,6 +32,36 @@ function getOpenAIClient(): OpenAI {
 }
 
 /**
+ * Initialize Anthropic client with configuration
+ */
+function getAnthropicClient(): Anthropic {
+  const config = loadConfig();
+  
+  // Get the API key from config or environment variable
+  let apiKey = config.anthropic_key;
+  
+  // Check if the key is an environment variable reference
+  if (apiKey.startsWith('env:')) {
+    const envVarName = apiKey.substring(4);
+    apiKey = process.env[envVarName] || '';
+  }
+  
+  // Validate API key
+  if (!apiKey) {
+    throw new Error('Anthropic API key not found. Please set it in .checkmate or as ANTHROPIC_API_KEY environment variable.');
+  }
+  
+  return new Anthropic({ apiKey });
+}
+
+/**
+ * Check if the model is an Anthropic model
+ */
+function isAnthropicModel(modelName: string): boolean {
+  return modelName.toLowerCase().includes('claude');
+}
+
+/**
  * Call the AI model using the specified slot
  * 
  * @param slot - The model slot to use ('reason' or 'quick')
@@ -45,7 +76,6 @@ export async function callModel(
 ): Promise<string> {
   const config = loadConfig();
   const modelName = config.models[slot];
-  const client = getOpenAIClient();
   
   try {
     // Configure temperature based on slot
@@ -53,22 +83,84 @@ export async function callModel(
     // - 'quick' uses lower temperature for consistent evaluations
     const temperature = slot === 'quick' ? 0 : 0.2;
     
-    const response = await client.chat.completions.create({
-      model: modelName,
-      temperature,
-      max_tokens: 4096,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ]
-    });
-    
-    // Extract and return the response text
-    return response.choices[0].message.content?.trim() || '';
+    // Use the appropriate API based on the model
+    if (isAnthropicModel(modelName)) {
+      return callAnthropicModel(modelName, systemPrompt, userPrompt, temperature);
+    } else {
+      return callOpenAIModel(modelName, systemPrompt, userPrompt, temperature);
+    }
   } catch (error) {
     console.error(`Error calling ${slot} model:`, error);
     throw error;
   }
+}
+
+/**
+ * Call the OpenAI API with the specified parameters
+ */
+async function callOpenAIModel(
+  modelName: string,
+  systemPrompt: string,
+  userPrompt: string,
+  temperature: number
+): Promise<string> {
+  const client = getOpenAIClient();
+  
+  // For newer models like gpt-4o, use max_completion_tokens instead of max_tokens
+  const params: any = {
+    model: modelName,
+    temperature,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ]
+  };
+  
+  // Choose the right parameter based on the model name
+  // GPT-4o and newer models require max_completion_tokens
+  if (modelName.includes('gpt-4o') || modelName.includes('o3')) {
+    params.max_completion_tokens = 4096;
+  } else {
+    params.max_tokens = 4096;
+  }
+  
+  const response = await client.chat.completions.create(params);
+  
+  // Extract and return the response text
+  return response.choices[0].message.content?.trim() || '';
+}
+
+/**
+ * Call the Anthropic API with the specified parameters
+ */
+async function callAnthropicModel(
+  modelName: string,
+  systemPrompt: string,
+  userPrompt: string,
+  temperature: number
+): Promise<string> {
+  const client = getAnthropicClient();
+  
+  const response = await client.messages.create({
+    model: modelName,
+    max_tokens: 4096,
+    temperature,
+    system: systemPrompt,
+    messages: [
+      { role: 'user', content: userPrompt }
+    ]
+  });
+  
+  // Extract and return the response text
+  // Check the content type before accessing the text property
+  if (response.content && response.content.length > 0) {
+    const contentBlock = response.content[0];
+    if (contentBlock.type === 'text') {
+      return contentBlock.text.trim();
+    }
+  }
+  
+  throw new Error('Unexpected response format from Anthropic API');
 }
 
 /**

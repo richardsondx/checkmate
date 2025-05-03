@@ -35,15 +35,32 @@ async function setupMcp() {
     console.log(chalk.green(`✅ Created ${CURSOR_CONFIG_DIR} directory`));
   }
   
-  // Load CheckMate config to get API key if available
+  // Load CheckMate config to get API keys if available
   const checkmateConfig = loadConfig();
   
-  // Get API key from CheckMate config
-  const apiKey = checkmateConfig.openai_key || 'your-key-here';
+  // Get API keys from CheckMate config
+  const openaiKey = checkmateConfig.openai_key || 'your-openai-key-here';
+  const anthropicKey = checkmateConfig.anthropic_key || 'your-anthropic-key-here';
   
   // Get model names from CheckMate config
   const reasonModel = checkmateConfig.models.reason;
   const quickModel = checkmateConfig.models.quick;
+  
+  // Determine which API keys to include based on model choices
+  const envVars: Record<string, string> = {
+    CHECKMATE_MODEL_REASON: reasonModel,
+    CHECKMATE_MODEL_QUICK: quickModel
+  };
+  
+  // Add OpenAI key if using GPT models
+  if (reasonModel.includes('gpt') || quickModel.includes('gpt')) {
+    envVars.OPENAI_API_KEY = openaiKey;
+  }
+  
+  // Add Anthropic key if using Claude models
+  if (reasonModel.includes('claude') || quickModel.includes('claude')) {
+    envVars.ANTHROPIC_API_KEY = anthropicKey;
+  }
   
   // Create MCP configuration
   const mcpConfig: MCPConfig = {
@@ -53,11 +70,7 @@ async function setupMcp() {
         args: [
           'dist/mcp/index.js'
         ],
-        env: {
-          OPENAI_API_KEY: apiKey,
-          CHECKMATE_MODEL_REASON: reasonModel,
-          CHECKMATE_MODEL_QUICK: quickModel
-        }
+        env: envVars
       }
     }
   };
@@ -93,11 +106,20 @@ async function setupMcp() {
   
   console.log(chalk.green(`✅ Updated ${CURSOR_CONFIG_FILE} with CheckMate MCP configuration`));
   
-  // Display success message
+  // Display success message with info about used models
   printBox(`
 🎉 CheckMate MCP Setup Complete!
 
 ${chalk.cyan(CURSOR_CONFIG_FILE)} has been configured for CheckMate.
+
+Using models:
+- Reasoning: ${chalk.green(reasonModel)}
+- Quick checks: ${chalk.green(quickModel)}
+
+${reasonModel.includes('claude') ? 
+  chalk.yellow('⚠️ Using Claude model. Make sure your ANTHROPIC_API_KEY is set.') : ''}
+${quickModel.includes('gpt') ? 
+  chalk.yellow('⚠️ Using GPT model. Make sure your OPENAI_API_KEY is set.') : ''}
 
 To use with Cursor:
 1. Restart Cursor

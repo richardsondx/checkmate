@@ -30,6 +30,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/string-similarity": "^4.0.2",
     "@types/yargs": "^17.0.33",
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
@@ -38,12 +39,18 @@
     "inquirer": "^12.6.0",
     "simple-git": "^3.27.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "yaml": "^2.7.1",
     "yargs": "^17.7.2"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.1",
     "ai": "^2.2.34",
-    "openai": "^4.29.0"
+    "dotenv": "^16.5.0",
+    "fast-glob": "^3.3.3",
+    "openai": "^4.29.0",
+    "ora": "^8.2.0",
+    "string-similarity": "^4.0.4"
   }
 }

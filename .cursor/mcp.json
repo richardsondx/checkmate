@@ -6,13 +6,7 @@
           "-y",
           "--package=ts-node",
           "--call=src/mcp/index.ts"
-        ],
-        "env": {
-          "OPENAI_API_KEY": "sk-...",
-          "CHECKMATE_MODEL_REASON": "o3",
-          "CHECKMATE_MODEL_QUICK": "gpt-4o-mini"
-        }
+        ]
       }
     }
-  }
-  
+}

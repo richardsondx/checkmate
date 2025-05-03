@@ -2,17 +2,18 @@
  * Config-related commands for CheckMate CLI
  */
 import { printBox } from '../ui/banner.js';
-import * as config from '../lib/config.js';
+import { load, save, ensureConfigExists, updateModel, setLogMode as configSetLogMode } from '../lib/config.js';
 import * as cursor from '../lib/cursor.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import chalk from 'chalk';
 
 /**
  * Initialize configuration
  */
 export function init(): void {
   // Ensure CheckMate config exists
-  config.ensureConfigExists();
+  ensureConfigExists();
   
   // Create checkmate folders
   const checkmateDirs = [
@@ -103,23 +104,74 @@ function updateGitignore(): void {
  * Show current configuration
  */
 export function show(): void {
-  const currentConfig = config.load();
-  console.log('Current configuration:');
-  console.log(JSON.stringify(currentConfig, null, 2));
+  const configuration = load();
+  
+  // Check for API keys
+  const openaiKeyStatus = configuration.openai_key ? 
+    chalk.green('✅ Set') : 
+    chalk.yellow('⚠️ Not set');
+  
+  const anthropicKeyStatus = configuration.anthropic_key ? 
+    chalk.green('✅ Set') : 
+    chalk.yellow('⚠️ Not set');
+  
+  // Format model names
+  const reasonModel = configuration.models.reason;
+  const quickModel = configuration.models.quick;
+  
+  console.log('\nCheckMate Configuration:');
+  console.log('------------------------');
+  console.log(`OpenAI API Key: ${openaiKeyStatus}`);
+  console.log(`Anthropic API Key: ${anthropicKeyStatus}`);
+  console.log(`Models:`);
+  console.log(`  reason: ${reasonModel}`);
+  console.log(`  quick: ${quickModel}`);
+  console.log(`Log mode: ${configuration.log}`);
+  console.log(`Context top N: ${configuration.context_top_n}`);
+  console.log(`Show thinking: ${configuration.show_thinking ? 'true' : 'false'}`);
+  
+  // Provide instructions
+  console.log('\nTo update configuration:');
+  console.log(`  OpenAI API key: Edit .checkmate file directly`);
+  console.log(`  Anthropic API key: Edit .checkmate file directly or run 'checkmate config set-anthropic-key <key>'`);
+  console.log(`  Model: checkmate model set <slot> <name>`);
+  console.log(`  Log mode: checkmate log <mode>`);
 }
 
 /**
  * Set model for a specific slot
  */
 export function setModel(slot: 'reason' | 'quick', modelName: string): void {
-  config.updateModel(slot, modelName);
-  printBox(`Model for ${slot} set to ${modelName}`);
+  try {
+    updateModel(slot, modelName);
+    console.log(`Model ${chalk.cyan(slot)} set to ${chalk.green(modelName)}`);
+  } catch (error) {
+    console.error(`Error setting model: ${error}`);
+  }
 }
 
 /**
  * Set log mode
  */
 export function setLogMode(mode: 'on' | 'off' | 'optional'): void {
-  config.setLogMode(mode);
-  printBox(`Log mode set to ${mode}`);
+  try {
+    configSetLogMode(mode);
+    console.log(`Log mode set to ${chalk.green(mode)}`);
+  } catch (error) {
+    console.error(`Error setting log mode: ${error}`);
+  }
+}
+
+/**
+ * Set Anthropic API key
+ */
+export function setAnthropicKey(key: string): void {
+  try {
+    const configuration = load();
+    configuration.anthropic_key = key;
+    save(configuration);
+    console.log(`Anthropic API key ${chalk.green('set successfully')}`);
+  } catch (error) {
+    console.error(`Error setting Anthropic API key: ${error}`);
+  }
 } 

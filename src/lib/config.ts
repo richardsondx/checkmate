@@ -9,23 +9,29 @@ import { parse, stringify } from 'yaml';
 // Type definitions for config
 export interface CheckMateConfig {
   openai_key: string;
+  anthropic_key: string;
   models: {
     reason: string;
     quick: string;
   };
   tree_cmd: string;
   log: 'on' | 'off' | 'optional';
+  context_top_n: number;
+  show_thinking: boolean;
 }
 
 // Default configuration
 const DEFAULT_CONFIG: CheckMateConfig = {
   openai_key: '',
+  anthropic_key: '',
   models: {
-    reason: 'gpt-4o',
+    reason: 'claude-3-7-sonnet-20250219',
     quick: 'gpt-4o-mini',
   },
   tree_cmd: "git ls-files | grep -E '\\\\.(ts|js|tsx|jsx)$'",
   log: 'optional',
+  context_top_n: 40,
+  show_thinking: true,
 };
 
 // Path to config file
