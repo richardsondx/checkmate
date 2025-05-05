@@ -308,11 +308,16 @@ async function generateDiffReport(specRequirements: string[], implBullets: strin
   status: 'match' | 'gap' | 'conflict';
   similarity: number;
 }>> {
-  const report = [];
+  const report: Array<{
+    specBullet: string;
+    implBullet: string;
+    status: 'match' | 'gap' | 'conflict';
+    similarity: number;
+  }> = [];
   
   // If either array is empty, return a simple report
   if (specRequirements.length === 0 || implBullets.length === 0) {
-    const status = 'conflict';
+    const status: 'match' | 'gap' | 'conflict' = 'conflict';
     
     if (specRequirements.length === 0) {
       // No spec requirements

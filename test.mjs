@@ -1,7 +1,13 @@
 import OpenAI from 'openai';
+import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
 
 async function test() {
   try {
+    // Load API key from .checkmate file
+    const configContent = readFileSync('.checkmate', 'utf8');
+    const config = parse(configContent);
+    
     const openai = new OpenAI({
       apiKey: config.openai_key
     });

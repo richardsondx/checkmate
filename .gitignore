@@ -7,6 +7,7 @@ dist/
 # CheckMate folders (as per spec)
 checkmate/
 .checkmate
+.cursor/config.json
 
 # Logs
 *.log
