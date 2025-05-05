@@ -16,20 +16,37 @@ import * as runCommands from './commands/run.js';
 import * as affectedCommands from './commands/affected.js';
 import * as watchCommands from './commands/watch.js';
 import * as createCommands from './commands/create.js';
+import * as cleanCommands from './commands/clean.js';
+import * as scaffoldCommands from './commands/scaffold.js';
 import * as specs from './lib/specs.js';
 import { Argv } from 'yargs';
 import * as modelCommands from './commands/model.js';
-
-// Print the welcome banner
-printBanner();
+import * as promoteCommands from './commands/promote.js';
+import * as testAgentCommands from './commands/test-agent.js';
+import * as testMarkdownCommands from './commands/test-markdown.js';
+import * as validateMarkdownCommands from './commands/validate-markdown.js';
+import * as snapCommands from './commands/snap.js';
+import * as hybridizeCommands from './commands/hybridize.js';
+import * as draftCommands from './commands/draft.js';
+import * as saveCommands from './commands/save.js';
+import * as autoFilesCommands from './commands/auto-files.js';
 
 // Initialize yargs parser
 const yargsInstance = yargs(hideBin(process.argv));
+
+// Only show welcome banner on init command or when no command is specified
+const command = process.argv.length > 2 ? process.argv[2] : null;
+const showBannerCommands = ['init', null, 'help', '--help', '-h', 'status'];
+if (showBannerCommands.includes(command)) {
+  printBanner();
+}
 
 // Parse command line arguments
 yargsInstance
   // Init command
   .command('init', 'Initialize CheckMate in the current project', {}, () => {
+    // Always show banner for init
+    printBanner();
     configCommands.init();
   })
   
@@ -125,17 +142,97 @@ yargsInstance
           describe: 'Scan all file types, not just code files',
           type: 'boolean',
           default: false
+        })
+        .option('dry-run', {
+          describe: 'Generate the spec but do not write it to disk',
+          type: 'boolean',
+          default: false
+        })
+        .option('no-test', {
+          describe: 'Do not generate test code for requirements',
+          type: 'boolean',
+          default: false
+        })
+        .option('open', {
+          describe: 'Open the generated spec in your editor',
+          type: 'boolean',
+          default: false
+        })
+        .option('agent', {
+          describe: 'Generate a YAML agent spec instead of Markdown',
+          type: 'boolean',
+          default: false
+        })
+        .option('type', {
+          describe: 'Type of specification to generate (A or B)',
+          type: 'string',
+          choices: ['A', 'B']
+        })
+        .option('interactive', {
+          describe: 'Use interactive mode to review and edit spec generation',
+          type: 'boolean',
+          alias: 'i',
+          default: false
+        })
+        .option('files', {
+          describe: 'Explicitly specify files to include (glob patterns allowed)',
+          type: 'array'
         });
     },
     async (argv: any) => {
-      await genCommands.generateSpec(argv.description, {
-        allFiles: argv.allFiles
+      await genCommands.genCommand({
+        name: argv.description,
+        description: argv.description,
+        type: argv.type,
+        output: argv.output,
+        interactive: argv.interactive,
+        files: argv.files,
+        agent: argv.agent
       });
     }
   )
   .command('specs', 'List all spec files', {}, () => {
-    genCommands.listSpecs();
+    specs.listSpecs();
   })
+  
+  // Scaffold command
+  .command(
+    'scaffold <path>',
+    'Create a spec scaffold with the new YAML format',
+    (yargs: Argv) => {
+      return yargs
+        .positional('path', {
+          describe: 'Path for the spec file (or base name without extension)',
+          type: 'string',
+          demandOption: true
+        })
+        .option('title', {
+          describe: 'Title for the spec',
+          type: 'string'
+        })
+        .option('file', {
+          describe: 'Files to include in the spec (can be specified multiple times)',
+          type: 'array'
+        })
+        .option('require', {
+          describe: 'Requirements to include (can be specified multiple times)',
+          type: 'array'
+        })
+        .option('output', {
+          describe: 'Output file path (default: checkmate/specs/[slug].yaml)',
+          type: 'string'
+        })
+        .option('open', {
+          describe: 'Open the generated spec in your editor',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      const options = scaffoldCommands.parseScaffoldArgs(argv);
+      await scaffoldCommands.scaffoldSpec(argv.path, options);
+    }
+  )
   
   // Create command (new)
   .command(
@@ -155,6 +252,11 @@ yargsInstance
           describe: 'Update an existing spec by slug',
           type: 'string'
         })
+        .option('agent', {
+          describe: 'Create a YAML agent spec in the agents folder',
+          type: 'boolean',
+          default: false
+        })
         .check((argv) => {
           const hasOptions = argv.json || argv.prd || argv.update;
           if (!hasOptions) {
@@ -167,7 +269,8 @@ yargsInstance
       await createCommands.handleCreate({
         json: argv.json,
         prd: argv.prd,
-        update: argv.update
+        update: argv.update,
+        agent: argv.agent
       });
     }
   )
@@ -186,14 +289,28 @@ yargsInstance
         .option('target', {
           describe: 'Run only specific specs (comma-separated names or paths)',
           type: 'string'
+        })
+        .option('type', {
+          describe: 'Run only specs of a certain type (A or B)',
+          type: 'string',
+          choices: ['A', 'B']
+        })
+        .option('fail-early', {
+          describe: 'Stop execution on the first failing requirement',
+          type: 'boolean',
+          default: false
         });
     },
     async (argv: any) => {
       const reset = !argv.noreset;
-      const targets = argv.target ? argv.target.split(',') : [];
       
-      const success = await runCommands.runTarget(targets, reset);
-      process.exit(success ? 0 : 1); // Exit with error code if any spec failed
+      await runCommands.runCommand({
+        target: argv.target,
+        reset: reset,
+        all: !argv.target && !argv.type,
+        type: argv.type,
+        failEarly: argv.failEarly || false
+      });
     }
   )
   .command(
@@ -216,8 +333,7 @@ yargsInstance
           process.exit(1);
         }
         
-        const success = await runCommands.runNext(specPath);
-        process.exit(success ? 0 : 1);
+        await runCommands.runCommand({ target: argv.spec });
       } else {
         // Find the first spec with unchecked requirements
         const specFiles = specs.listSpecs();
@@ -235,8 +351,7 @@ yargsInstance
           
           if (hasUnchecked) {
             console.log(`Found unchecked requirements in ${path.basename(specFile)}`);
-            const success = await runCommands.runNext(specFile);
-            process.exit(success ? 0 : 1);
+            await runCommands.runCommand({ target: specFile });
             foundUnchecked = true;
             break;
           }
@@ -275,16 +390,91 @@ yargsInstance
   )
   
   // Watch command
-  .command('watch', 'Start a live dashboard that monitors test runs', {}, async () => {
-    await watchCommands.watch();
-  })
+  .command(
+    'watch',
+    'Start a live dashboard that monitors test runs',
+    (yargs: Argv) => {
+      return yargs
+        .option('filter', {
+          describe: 'Filter specs by name (case-insensitive substring match)',
+          type: 'string',
+          alias: 'f'
+        })
+        .option('type', {
+          describe: 'Filter specs by type (USER or AGENT)',
+          type: 'string',
+          choices: ['USER', 'AGENT', 'user', 'agent']
+        })
+        .option('status', {
+          describe: 'Filter specs by status (PASS or FAIL)',
+          type: 'string',
+          choices: ['PASS', 'FAIL', 'pass', 'fail']
+        })
+        .option('limit', {
+          describe: 'Maximum number of specs to display',
+          type: 'number',
+          default: 10
+        })
+        .option('spec', {
+          describe: 'Watch a specific spec, optionally until it passes',
+          type: 'string',
+          alias: 's'
+        })
+        .option('until-pass', {
+          describe: 'Watch the specified spec until it passes',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      await watchCommands.watch({
+        filter: argv.filter,
+        typeFilter: argv.type?.toUpperCase(),
+        statusFilter: argv.status?.toUpperCase(),
+        limit: argv.limit,
+        spec: argv.spec,
+        untilPass: argv.untilPass
+      });
+    }
+  )
+  
+  // Clean cache command
+  .command(
+    'clean',
+    'Clean the cache by removing entries for deleted specs',
+    (yargs: Argv) => {
+      return yargs
+        .option('force', {
+          describe: 'Force clean all cache entries regardless of existing specs',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      if (argv.force) {
+        await cleanCommands.forceCleanCache();
+      } else {
+        await cleanCommands.cleanCache();
+      }
+    }
+  )
   
   // Status command to test AI integration
-  .command('status', 'Test the AI model integration', {}, async () => {
-    // Import dynamically to avoid circular dependencies
-    const statusModule = await import('./commands/status.js');
-    // The status module has a self-executing function
-  })
+  .command('status', 'Test the AI model integration', 
+    (yargs: Argv) => {
+      return yargs
+        .option('type', {
+          describe: 'Show status for a specific type of specification (A or B)',
+          type: 'string',
+          choices: ['A', 'B']
+        });
+    }, 
+    async (argv: any) => {
+      // Import dynamically to avoid circular dependencies
+      const statusModule = await import('./commands/status.js');
+      // Call the status command function explicitly
+      await statusModule.statusCommand({ type: argv.type });
+    })
   
   // Setup MCP command
   .command('setup-mcp', 'Set up CheckMate as a Cursor MCP server', {}, async () => {
@@ -339,6 +529,500 @@ yargsInstance
     },
     handler: () => {}
   })
+  
+  // Promote command
+  .command(
+    'promote',
+    'Promote a Markdown spec to a YAML agent spec',
+    (yargs: Argv) => {
+      return yargs
+        .option('spec', {
+          describe: 'Markdown spec to convert to a YAML agent spec',
+          type: 'string',
+          demandOption: true,
+          alias: 's'
+        })
+        .option('selected-only', {
+          describe: 'Only promote requirements that are failing (not checked)',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      await promoteCommands.promoteCommand({
+        spec: argv.spec,
+        selectedOnly: argv.selectedOnly
+      });
+    }
+  )
+  
+  // Test agent command
+  .command(
+    'test-agent <feature>',
+    'Test agent generation with different parameters',
+    (yargs: Argv) => {
+      return yargs
+        .positional('feature', {
+          describe: 'Feature description to use for agent generation',
+          type: 'string',
+          demandOption: true
+        })
+        .option('model', {
+          describe: 'AI model to use for generation',
+          type: 'string'
+        })
+        .option('temperature', {
+          describe: 'Temperature for AI generation (0.0-1.0)',
+          type: 'number'
+        })
+        .option('files', {
+          describe: 'Files to include in context (can specify multiple)',
+          type: 'array'
+        })
+        .option('output', {
+          describe: 'Output file path (default: checkmate/specs/agents/<slug>.yaml)',
+          type: 'string'
+        })
+        .option('dry-run', {
+          describe: 'Generate but don\'t save to disk',
+          type: 'boolean',
+          default: false
+        })
+        .option('format', {
+          describe: 'Output format (yaml or json)',
+          choices: ['yaml', 'json'],
+          default: 'yaml',
+          type: 'string'
+        });
+    },
+    async (argv: any) => {
+      const testAgentModule = await import('./commands/test-agent.js');
+      await testAgentModule.testAgent({
+        feature: argv.feature,
+        model: argv.model,
+        temperature: argv.temperature,
+        files: argv.files,
+        output: argv.output,
+        dryRun: argv.dryRun,
+        format: argv.format
+      });
+    }
+  )
+  
+  // Test markdown command
+  .command(
+    'test-markdown',
+    'Generate and test sample Markdown content',
+    (yargs: Argv) => {
+      return yargs
+        .option('output', {
+          describe: 'Output file path for the generated Markdown',
+          type: 'string',
+          alias: 'o'
+        })
+        .option('verbose', {
+          describe: 'Show detailed output',
+          type: 'boolean',
+          default: false,
+          alias: 'v'
+        })
+        .option('validate', {
+          describe: 'Validate the generated Markdown',
+          type: 'boolean',
+          default: true
+        })
+        .option('format', {
+          describe: 'Markdown format to validate against',
+          type: 'string',
+          choices: ['commonmark', 'github', 'checkmate'],
+          default: 'github'
+        })
+        .option('input', {
+          describe: 'Input file path to validate instead of generating',
+          type: 'string',
+          alias: 'i'
+        });
+    },
+    async (argv: any) => {
+      const testMarkdownModule = await import('./commands/test-markdown.js');
+      await testMarkdownModule.testMarkdown({
+        output: argv.output,
+        verbose: argv.verbose,
+        validate: argv.validate,
+        format: argv.format,
+        input: argv.input
+      });
+    }
+  )
+  
+  // Validate markdown command
+  .command(
+    'validate-markdown',
+    'Validate Markdown files against the CommonMark or GitHub Flavored Markdown specification',
+    (yargs: Argv) => {
+      return yargs
+        .option('file', {
+          describe: 'Path to a Markdown file to validate',
+          type: 'string',
+          alias: 'f'
+        })
+        .option('dir', {
+          describe: 'Directory containing Markdown files to validate',
+          type: 'string',
+          alias: 'd'
+        })
+        .option('spec', {
+          describe: 'Markdown specification to validate against',
+          type: 'string',
+          choices: ['commonmark', 'github', 'gfm', 'checkmate'],
+          default: 'commonmark'
+        })
+        .option('strict', {
+          describe: 'Enforce strict validation',
+          type: 'boolean',
+          default: true
+        })
+        .option('extended', {
+          describe: 'Support extended syntax features (tables, strikethrough, etc.)',
+          type: 'boolean',
+          default: false
+        })
+        .option('output', {
+          describe: 'Output file path for validation results',
+          type: 'string',
+          alias: 'o'
+        })
+        .option('verbose', {
+          describe: 'Show detailed output including warnings',
+          type: 'boolean',
+          default: false,
+          alias: 'v'
+        })
+        .check((argv) => {
+          if (!argv.file && !argv.dir) {
+            throw new Error('Either --file or --dir is required');
+          }
+          return true;
+        });
+    },
+    async (argv: any) => {
+      const validateMarkdownModule = await import('./commands/validate-markdown.js');
+      await validateMarkdownModule.validateMarkdown({
+        file: argv.file,
+        dir: argv.dir,
+        spec: argv.spec,
+        strict: argv.strict,
+        extended: argv.extended,
+        output: argv.output,
+        verbose: argv.verbose
+      });
+    }
+  )
+  
+  // Markdown test suite command
+  .command(
+    'markdown-test',
+    'Run test suite for Markdown rendering against CommonMark specification',
+    (yargs: Argv) => {
+      return yargs
+        .option('output', {
+          describe: 'Output file path for test results',
+          type: 'string',
+          alias: 'o'
+        });
+    },
+    async (argv: any) => {
+      const validateMarkdownModule = await import('./commands/validate-markdown.js');
+      await validateMarkdownModule.generateMarkdownTestSuite(argv.output);
+    }
+  )
+  
+  // Cursor command group
+  .command({
+    command: 'cursor <command>',
+    describe: 'Cursor-specific commands',
+    builder: (yargs: Argv) => {
+      return yargs
+        .command({
+          command: 'test-markdown',
+          describe: 'Generate and test sample Markdown content',
+          builder: (yargs: Argv) => {
+            return yargs
+              .option('output', {
+                describe: 'Output file path for the generated Markdown',
+                type: 'string',
+                alias: 'o'
+              })
+              .option('verbose', {
+                describe: 'Show detailed output',
+                type: 'boolean',
+                default: false,
+                alias: 'v'
+              })
+              .option('validate', {
+                describe: 'Validate the generated Markdown',
+                type: 'boolean',
+                default: true
+              })
+              .option('format', {
+                describe: 'Markdown format to validate against',
+                type: 'string',
+                choices: ['commonmark', 'github', 'checkmate'],
+                default: 'github'
+              })
+              .option('input', {
+                describe: 'Input file path to validate instead of generating',
+                type: 'string',
+                alias: 'i'
+              });
+          },
+          handler: async (argv: any) => {
+            const testMarkdownModule = await import('./commands/test-markdown.js');
+            await testMarkdownModule.testMarkdown({
+              output: argv.output,
+              verbose: argv.verbose,
+              validate: argv.validate,
+              format: argv.format,
+              input: argv.input
+            });
+          }
+        })
+        .demandCommand(1, 'You need to specify a valid cursor subcommand')
+        .help();
+    },
+    handler: () => {}
+  })
+  
+  // Add the snap command
+  .command(
+    'snap',
+    'Manage file snapshots and detect renames',
+    (yargs: Argv) => {
+      return yargs
+        .option('detect', {
+          describe: 'Detect renamed files',
+          type: 'boolean',
+          default: false
+        })
+        .option('repair', {
+          describe: 'Repair specs with renamed files',
+          type: 'boolean',
+          default: false
+        })
+        .option('auto', {
+          describe: 'Automatically apply all repairs without prompting',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      await snapCommands.snapCommand({
+        detect: argv.detect,
+        repair: argv.repair,
+        auto: argv.auto
+      });
+    }
+  )
+  
+  // Add the hybridize command
+  .command(
+    'hybridize',
+    'Convert a Markdown spec to hybrid format with embedded tests',
+    (yargs: Argv) => {
+      return yargs
+        .option('spec', {
+          describe: 'Markdown spec to convert to hybrid format',
+          type: 'string',
+          demandOption: true,
+          alias: 's'
+        })
+        .option('force', {
+          describe: 'Force hybridization even if the spec already has embedded tests',
+          type: 'boolean',
+          default: false,
+          alias: 'f'
+        });
+    },
+    async (argv: any) => {
+      await hybridizeCommands.hybridizeCommand({
+        spec: argv.spec,
+        force: argv.force
+      });
+    }
+  )
+  
+  // Add the draft command
+  .command(
+    'draft',
+    'Generate draft specifications without writing to disk',
+    (yargs: Argv) => {
+      return yargs
+        .option('description', {
+          describe: 'Description of features to generate specs for',
+          type: 'string',
+          demandOption: true,
+          alias: 'd'
+        })
+        .option('context', {
+          describe: 'Number of relevant files to include for context (default: 50)',
+          type: 'number',
+          default: 50
+        })
+        .option('return', {
+          describe: 'Format to return drafts in (md, yaml, both)',
+          type: 'string',
+          choices: ['md', 'yaml', 'both'],
+          default: 'md'
+        })
+        .option('json', {
+          describe: 'Output as JSON (always on for programmatic use)',
+          type: 'boolean',
+          default: true,
+          hidden: true
+        });
+    },
+    async (argv: any) => {
+      const drafts = await draftCommands.draftCommand({
+        description: argv.description,
+        context: argv.context,
+        return: argv.return
+      });
+      
+      // Always output as JSON
+      console.log(draftCommands.formatDraftsAsJson(drafts));
+    }
+  )
+  
+  // Add the save command
+  .command(
+    'save',
+    'Save approved draft specifications to disk',
+    (yargs: Argv) => {
+      return yargs
+        .option('json', {
+          describe: 'JSON draft specifications to save',
+          type: 'string',
+          demandOption: true
+        })
+        .option('format', {
+          describe: 'Format to save specs in (md, yaml, both)',
+          type: 'string',
+          choices: ['md', 'yaml', 'both'],
+          default: 'md'
+        })
+        .option('force', {
+          describe: 'Save all specs even if not approved',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      const result = await saveCommands.saveCommand({
+        json: argv.json,
+        format: argv.format,
+        force: argv.force
+      });
+      
+      console.log(JSON.stringify(result));
+    }
+  )
+  
+  // Add the warmup command
+  .command(
+    'warmup',
+    'Scan a repository and suggest specs for existing code',
+    (yargs: Argv) => {
+      return yargs
+        .option('output', {
+          describe: 'Output format (json or table)',
+          type: 'string',
+          choices: ['json', 'table'],
+          default: 'json'
+        })
+        .option('top-files', {
+          describe: 'Number of top files to include in analysis',
+          type: 'number',
+          default: 100
+        })
+        .option('model', {
+          describe: 'Model to use for analysis',
+          type: 'string'
+        });
+    },
+    async (argv: any) => {
+      const warmupModule = await import('./commands/warmup.js');
+      await warmupModule.warmupCommand(warmupModule.parseWarmupArgs(argv));
+    }
+  )
+  
+  // Add the auto-files command
+  .command(
+    'auto-files',
+    'Manage automatic file discovery for specs',
+    (yargs: Argv) => {
+      return yargs
+        .option('enable', {
+          describe: 'Enable auto-file discovery for specs',
+          type: 'boolean',
+          default: false
+        })
+        .option('update', {
+          describe: 'Update files for specs using auto-discovery',
+          type: 'boolean',
+          default: false
+        })
+        .option('spec', {
+          describe: 'Specific spec to process',
+          type: 'string'
+        })
+        .option('all', {
+          describe: 'Process all specs',
+          type: 'boolean',
+          default: false
+        })
+        .check((argv) => {
+          if (!argv.spec && !argv.all) {
+            throw new Error('Either --spec or --all is required');
+          }
+          if (!argv.enable && !argv.update) {
+            throw new Error('At least one of --enable or --update is required');
+          }
+          return true;
+        });
+    },
+    async (argv: any) => {
+      await autoFilesCommands.autoFilesCommand(
+        autoFilesCommands.parseAutoFilesArgs(argv)
+      );
+    }
+  )
+  
+  // Add the clarify command
+  .command(
+    'clarify <slug>',
+    'Explain why a requirement is failing and suggest fixes',
+    (yargs: Argv) => {
+      return yargs
+        .positional('slug', {
+          describe: 'Slug of the spec to analyze',
+          type: 'string',
+          demandOption: true
+        })
+        .option('bullet', {
+          describe: 'Bullet number of the requirement to analyze',
+          type: 'number'
+        })
+        .option('json', {
+          describe: 'Output as JSON',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      const clarifyModule = await import('./commands/clarify.js');
+      await clarifyModule.clarifyCommand(clarifyModule.parseClarifyArgs(argv));
+    }
+  )
   
   // Default command when none is provided
   .command('$0', 'Show help', {}, () => {

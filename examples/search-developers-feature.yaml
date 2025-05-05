@@ -1,0 +1,59 @@
+title: Search Developers Feature
+files:
+  - src/lib/api/github-users.ts
+  - src/components/lead-finder/DeveloperSearch.tsx
+  - src/pages/find-by-issues.tsx
+checks:
+  - id: check-1
+    require: Function fetchDevelopers returns an array when called with a keyword
+    test: |
+      import { fetchDevelopers } from './src/lib/api/github-users';
+      const data = await fetchDevelopers('react');
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('fetchDevelopers returned no results');
+      }
+
+  - id: check-2
+    require: Filter object { language:"TypeScript" } narrows results
+    test: |
+      import { fetchDevelopers } from './src/lib/api/github-users';
+      const all = await fetchDevelopers('react');
+      const filtered = await fetchDevelopers('react', { language:'TypeScript' });
+      if (filtered.length === 0 || filtered.length >= all.length) {
+        throw new Error('language filter did not narrow results');
+      }
+
+  - id: check-3
+    require: DeveloperSearch component renders a search input
+    test: |
+      import { render, screen } from '@testing-library/react';
+      import DeveloperSearch from './src/components/lead-finder/DeveloperSearch';
+      render(<DeveloperSearch />);
+      if (!screen.getByRole('textbox', { name: /search/i })) {
+        throw new Error('search input missing');
+      }
+
+  - id: check-4
+    require: Search results are displayed in a table format
+    test: |
+      import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+      import DeveloperSearch from './src/components/lead-finder/DeveloperSearch';
+      
+      // Mock the API call
+      jest.mock('./src/lib/api/github-users', () => ({
+        fetchDevelopers: jest.fn().mockResolvedValue([
+          { login: 'testuser', name: 'Test User', contributions: 100 }
+        ])
+      }));
+      
+      render(<DeveloperSearch />);
+      const input = screen.getByRole('textbox', { name: /search/i });
+      fireEvent.change(input, { target: { value: 'react' } });
+      fireEvent.click(screen.getByRole('button', { name: /search/i }));
+      
+      await waitFor(() => {
+        const table = screen.getByRole('table');
+        if (!table) {
+          throw new Error('results table not found');
+        }
+      }); 

@@ -83,6 +83,32 @@ This document tracks the improvements made to the CheckMate CLI to enable reliab
   - `string-similarity` for relevance ranking
   - `tsx` for TypeScript execution
 
+### 7. Cursor Rule Files Enhancement
+
+- **Added `.mdc` Rule Files Integration**
+  - Created `src/lib/cursorRules.ts` to manage Cursor rule files
+  - Enhanced `init` command to automatically generate `.mdc` rule files
+  - Added three rule files following Cursor best practices:
+    - `pre-task.mdc` - For scope analysis before coding
+    - `post-task.mdc` - For verification after coding
+    - `post-push.mdc` - For full suite testing on pushes
+  - Made rule file generation idempotent to avoid overwriting customizations
+  - Added documentation in README about the rule files and their purpose
+
+### 8. Specification Format Improvements
+
+- **Markdown Specs Structure Refinement**
+  - Changed "Requirements" section to "Checks" for clarity and simplicity
+  - Removed unnecessary "Notes" sections from markdown specs
+  - Rewritten checks to focus on behavior rather than implementation details
+  - Standardized format across all markdown specs
+
+- **Comprehensive Architecture Documentation**
+  - Created detailed architecture document explaining all system components
+  - Documented data flow between components
+  - Added diagrams for key processes
+  - Included extension points and future directions
+
 ## Testing Results
 
 The implementation successfully:
@@ -127,3 +153,62 @@ For full production deployment, the following issues need to be addressed:
 - **CI Integration**: Add GitHub Actions workflow for spec validation
 - **UI Improvements**: Consider a web UI for spec visualization
 - **PRD Integration**: Enhance PRD parsing to extract more structured requirements
+- **Spec Format Consistency**: Implement coordinated update to align YAML "requirements" with markdown "checks":
+  
+  **Implementation Plan:**
+  1. **Code Updates**:
+     - Update `src/lib/specs.ts` to handle both "requirements" and "checks" fields in YAML parsing
+     - Modify `parseYamlSpec` and `validateYamlSpecStructure` functions
+     - Update the `Spec` interface to use a unified terminology
+     - Add backward compatibility for old-format files
+
+  2. **Promotion Tool**:
+     - Update `src/commands/promote.ts` to use "checks" instead of "requirements" when generating YAML
+     - Maintain compatibility with existing test code extraction logic
+
+  3. **Test Updates**:
+     - Update `test-spec-types.mjs` to test both formats during the transition
+     - Add tests specifically for the format migration
+
+  4. **Migration Script**:
+     - Create `convert-specs.ts` utility to update all agent YAML files:
+       ```typescript
+       // Convert YAML format from requirements to checks
+       function migrateSpecFile(filePath) {
+         const content = fs.readFileSync(filePath, 'utf8');
+         const data = parseYaml(content);
+         if (data.requirements && !data.checks) {
+           data.checks = data.requirements;
+           delete data.requirements;
+           
+           // Also rename internal fields
+           data.checks.forEach(check => {
+             if (check.require && !check.check) {
+               check.check = check.require;
+               delete check.require;
+             }
+           });
+           
+           fs.writeFileSync(filePath, stringifyYaml(data), 'utf8');
+           return true; // File was migrated
+         }
+         return false; // No migration needed
+       }
+       ```
+
+  5. **Documentation**:
+     - Update README and docs to reflect the new terminology
+     - Add a note about the change in the CHANGELOG
+     - Update examples to use consistent terminology
+
+  6. **Rollout Strategy**:
+     - Phase 1: Add support for reading both formats
+     - Phase 2: Convert existing files with migration script
+     - Phase 3: Update the spec creation to use new format only
+
+## agent‑spec support
+
+✅ loader glob updated
+✅ --agent flag implemented
+✅ promote command done
+✅ README new section added

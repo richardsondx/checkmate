@@ -18,6 +18,7 @@ export interface CheckMateConfig {
   log: 'on' | 'off' | 'optional';
   context_top_n: number;
   show_thinking: boolean;
+  use_embeddings: boolean;
 }
 
 // Default configuration
@@ -32,6 +33,7 @@ const DEFAULT_CONFIG: CheckMateConfig = {
   log: 'optional',
   context_top_n: 40,
   show_thinking: true,
+  use_embeddings: true,
 };
 
 // Path to config file

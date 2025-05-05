@@ -6,16 +6,42 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { load as loadConfig } from './config.js';
 import { callModel } from './models.js';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import crypto from 'crypto';
+import glob from 'fast-glob';
 
 // Directory where specs are stored
 const SPECS_DIR = 'checkmate/specs';
 
-// Ensure the specs directory exists
-function ensureSpecsDir(): void {
-  if (!fs.existsSync(SPECS_DIR)) {
-    fs.mkdirSync(SPECS_DIR, { recursive: true });
+// Create a simple validator function for YAML specs
+const validateYamlSpecStructure = (data: any): { valid: boolean; errors?: string[] } => {
+  const errors: string[] = [];
+  
+  // Check for required fields
+  if (!data.title) errors.push('Missing title field');
+  if (!data.files || !Array.isArray(data.files)) errors.push('Missing or invalid files array');
+  if (!data.checks && !data.requirements) errors.push('Missing or invalid checks array');
+  
+  // Check checks structure if present
+  if (data.checks && Array.isArray(data.checks)) {
+    data.checks.forEach((check: any, index: number) => {
+      if (!check.id) errors.push(`Check at index ${index} is missing id`);
+      if (!check.require && !check.text) errors.push(`Check at index ${index} is missing require or text field`);
+    });
   }
-}
+  // Backward compatibility for requirements
+  else if (data.requirements && Array.isArray(data.requirements)) {
+    data.requirements.forEach((req: any, index: number) => {
+      if (!req.id) errors.push(`Requirement at index ${index} is missing id`);
+      if (!req.require && !req.text) errors.push(`Requirement at index ${index} is missing require or text field`);
+    });
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors: errors.length > 0 ? errors : undefined
+  };
+};
 
 /**
  * Create a slug from a feature description
@@ -30,13 +56,13 @@ export function createSlug(featureDesc: string): string {
 
 /**
  * Create a new spec file from a feature description
- * Uses AI to generate requirements and context
+ * Uses AI to generate checks and context
  */
 export async function generateSpec(
   featureDesc: string, 
   files: string[]
 ): Promise<{ path: string; content: string }> {
-  console.log('Generating AI-driven requirements...');
+  console.log('Generating AI-driven checks...');
   
   // Create slug for the filename
   const slug = createSlug(featureDesc);
@@ -54,14 +80,14 @@ ${filesList}
 Generate a markdown document with:
 1. A title based on the feature description
 2. A list of relevant files from the ones listed above that would be involved in implementing this feature
-3. 4-6 specific, testable requirements for this feature (as a checklist with "[ ]" format)
+3. 4-6 specific, testable checks for this feature (as a checklist with "[ ]" format)
 4. Brief notes with any considerations or implementation details
 
 Return ONLY the markdown content, no explanations or additional text.`;
 
   // Define the system prompt for the model
   const systemPrompt = `You are a senior toolsmith specialized in creating software specifications.
-Your task is to create a detailed spec in markdown format, with clear requirements that can be checked programmatically.
+Your task is to create a detailed spec in markdown format, with clear checks that can be checked programmatically.
 Be specific, actionable, and focus on measurable outcomes.
 Format your response as a valid Markdown document.`;
 
@@ -85,7 +111,7 @@ Format your response as a valid Markdown document.`;
 ## Files
 ${files.map(file => `- ${file}`).join('\n')}
 
-## Requirements
+## Checks
 - [ ] Validate input data before processing
 - [ ] Return appropriate error codes for invalid requests
 - [ ] Update database with new information
@@ -107,39 +133,207 @@ ${files.map(file => `- ${file}`).join('\n')}
 }
 
 /**
- * Parse a spec file to extract requirements
+ * Define Check interface
  */
-export function parseSpec(filePath: string): { 
+export interface Requirement {
+  id: string;
+  require: string;
+  text?: string;
+  test?: string;
+  status: boolean;
+}
+
+// Alias Check to Requirement for backward compatibility
+export type Check = Requirement;
+
+/**
+ * Parse a spec file (both YAML and Markdown)
+ */
+export function parseSpec(specPath: string): { 
+  title: string; 
+  files: string[]; 
+  requirements: Requirement[];
+  checks?: Requirement[];
+  machine?: boolean;
+} {
+  const content = fs.readFileSync(specPath, 'utf8');
+  const extension = path.extname(specPath).toLowerCase();
+  
+  // Check if this spec is in the agents subfolder
+  const isAgentSpec = specPath.includes(`${SPECS_DIR}/agents/`);
+  
+  // Handle YAML files (.yaml, .yml)
+  if (extension === '.yaml' || extension === '.yml') {
+    const result = parseYamlSpec(content);
+    if (isAgentSpec) {
+      result.machine = true;
+    }
+    return result;
+  }
+  
+  // Handle Markdown files (.md)
+  const result = parseMarkdownSpec(content);
+  if (isAgentSpec) {
+    result.machine = true;
+  }
+  return result;
+}
+
+/**
+ * Validate YAML document against JSON schema
+ */
+export function validateYamlDocument(yamlContent: any): { valid: boolean; errors?: string[] } {
+  try {
+    const valid = validateYamlSpecStructure(yamlContent);
+    
+    if (!valid.valid) {
+      return {
+        valid: false,
+        errors: valid.errors
+      };
+    }
+    
+    return { valid: true };
+  } catch (error: any) {
+    return {
+      valid: false,
+      errors: [error.message]
+    };
+  }
+}
+
+/**
+ * Serialize JavaScript object to YAML string
+ */
+export function serializeToYaml(data: any): string {
+  try {
+    return stringifyYaml(data);
+  } catch (error: any) {
+    console.error('Error serializing to YAML:', error);
+    throw new Error(`Failed to serialize to YAML: ${error.message}`);
+  }
+}
+
+/**
+ * Update the parseYamlSpec function to use schema validation
+ */
+function parseYamlSpec(content: string): { 
   title: string;
   files: string[];
-  requirements: Array<{ text: string; status: boolean }>;
+  requirements: Requirement[];
+  checks?: Requirement[];
+  machine?: boolean;
 } {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const lines = content.split('\n');
+  try {
+    // Parse YAML content
+    const yamlData = parseYaml(content);
+    
+    // Validate against schema
+    const validationResult = validateYamlDocument(yamlData);
+    if (!validationResult.valid) {
+      const errorMsg = validationResult.errors ? validationResult.errors.join(', ') : 'Unknown validation error';
+      console.warn(`YAML validation warnings: ${errorMsg}`);
+    }
+    
+    // Use checks if available, fall back to requirements for backward compatibility
+    const checksArray = yamlData.checks || yamlData.requirements || [];
+    
+    // Convert checks to standard format with require/status
+    const checks = checksArray.map((check: any) => {
+      return {
+        id: check.id || crypto.randomBytes(4).toString('hex'),
+        require: check.require || check.text || 'Unknown check',
+        text: check.text,
+        test: check.test,
+        status: check.status === true
+      };
+    });
+    
+    return {
+      title: yamlData.title || 'Untitled Spec',
+      files: yamlData.files || [],
+      requirements: checks, // For backward compatibility
+      checks,
+      machine: false
+    };
+  } catch (error) {
+    console.error('Error parsing YAML spec:', error);
+    return {
+      title: 'Error parsing spec',
+      files: [],
+      requirements: [],
+      checks: [],
+      machine: false
+    };
+  }
+}
+
+/**
+ * Parse Markdown file
+ */
+function parseMarkdownSpec(content: string): { 
+  title: string;
+  files: string[];
+  requirements: Requirement[];
+  checks?: Requirement[];
+  machine?: boolean;
+} {
+  // Extract title from the first heading
+  const titleMatch = content.match(/# (?:Feature: )?(.*?)(?=\n|$)/);
+  const title = titleMatch ? titleMatch[1].trim() : 'Untitled Spec';
   
-  let title = '';
+  // Extract files section
+  const filesSection = content.match(/(?:##|###) Files\s+([\s\S]*?)(?=##|$)/);
   const files: string[] = [];
-  const requirements: Array<{ text: string; status: boolean }> = [];
   
-  let section = '';
-  
-  for (const line of lines) {
-    if (line.startsWith('# Feature:')) {
-      title = line.substring(10).trim();
-    } else if (line.startsWith('## ')) {
-      section = line.substring(3).trim();
-    } else if (line.startsWith('- ') && section === 'Files') {
-      files.push(line.substring(2).trim());
-    } else if (line.startsWith('- [ ]') && section === 'Requirements') {
-      requirements.push({ text: line.substring(5).trim(), status: false });
-    } else if (line.startsWith('- [✓]') || line.startsWith('- [✔]') && section === 'Requirements') {
-      requirements.push({ text: line.substring(5).trim(), status: true });
-    } else if (line.startsWith('- [x]') || line.startsWith('- [X]') && section === 'Requirements') {
-      requirements.push({ text: line.substring(5).trim(), status: true });
+  if (filesSection && filesSection[1]) {
+    const fileLines = filesSection[1].split('\n');
+    
+    for (const line of fileLines) {
+      if (line.trim().startsWith('-')) {
+        const filePath = line.trim().substring(1).trim();
+        if (filePath) {
+          files.push(filePath);
+        }
+      }
     }
   }
   
-  return { title, files, requirements };
+  // Try to extract "Checks" section first, fallback to "Requirements" for backward compatibility
+  const checksSection = content.match(/(?:##|###) Checks\s+([\s\S]*?)(?=##|$)/);
+  const reqSection = !checksSection ? content.match(/(?:##|###) Requirements\s+([\s\S]*?)(?=##|$)/) : null;
+  const checks: Requirement[] = [];
+  
+  const section = checksSection || reqSection;
+  if (section && section[1]) {
+    const lines = section[1].split('\n');
+    
+    for (const line of lines) {
+      // Look for checkbox format: - [ ] or - [x]
+      const checkMatch = line.match(/- \[([ xX])\] (.*?)(?=\n|$)/);
+      
+      if (checkMatch) {
+        const status = checkMatch[1].toLowerCase() === 'x';
+        const text = checkMatch[2].trim();
+        
+        // Create a check with an ID
+        checks.push({
+          id: crypto.randomBytes(4).toString('hex'),
+          require: text,
+          text,
+          status
+        });
+      }
+    }
+  }
+  
+  return {
+    title,
+    files,
+    requirements: checks, // For backward compatibility
+    checks,
+    machine: false
+  };
 }
 
 /**
@@ -149,9 +343,8 @@ export function listSpecs(): string[] {
   ensureSpecsDir();
   
   try {
-    return fs.readdirSync(SPECS_DIR)
-      .filter(file => file.endsWith('.md'))
-      .map(file => path.join(SPECS_DIR, file));
+    // Use glob pattern to find specs in both root and agents subfolder
+    return glob.sync(`${SPECS_DIR}/**/*.{md,markdown,yaml,yml}`, { absolute: true });
   } catch (error) {
     console.error('Error listing specs:', error);
     return [];
@@ -164,17 +357,33 @@ export function listSpecs(): string[] {
 export function getSpecByName(name: string): string | null {
   ensureSpecsDir();
   
-  // If name already includes .md, use it directly
-  const specName = name.endsWith('.md') ? name : `${name}.md`;
-  const specPath = path.join(SPECS_DIR, specName);
+  // Check if name already includes a supported extension
+  const hasExtension = ['.md', '.yaml', '.yml'].some(ext => name.endsWith(ext));
   
-  if (fs.existsSync(specPath)) {
-    return specPath;
+  if (hasExtension) {
+    const specPath = path.join(SPECS_DIR, name);
+    if (fs.existsSync(specPath)) {
+      return specPath;
+    }
+  } else {
+    // Try with each extension
+    for (const ext of ['.md', '.yaml', '.yml']) {
+      const specPath = path.join(SPECS_DIR, `${name}${ext}`);
+      if (fs.existsSync(specPath)) {
+        return specPath;
+      }
+    }
   }
   
   // Try to find a partial match
-  const files = fs.readdirSync(SPECS_DIR).filter(file => file.endsWith('.md'));
-  const match = files.find(file => file.includes(name));
+  const files = fs.readdirSync(SPECS_DIR).filter(file => 
+    file.endsWith('.md') || file.endsWith('.yaml') || file.endsWith('.yml')
+  );
+  
+  const match = files.find(file => {
+    const baseName = path.basename(file, path.extname(file));
+    return baseName.toLowerCase().includes(name.toLowerCase());
+  });
   
   if (match) {
     return path.join(SPECS_DIR, match);
@@ -210,4 +419,29 @@ export function findAffectedSpecs(changedFiles: string[]): string[] {
   }
   
   return affectedSpecs;
+}
+
+/**
+ * Verify that files referenced in the spec exist
+ */
+export function verifyReferencedFiles(files: string[]): { valid: boolean; missing: string[] } {
+  const missing: string[] = [];
+  
+  for (const file of files) {
+    if (!fs.existsSync(file)) {
+      missing.push(file);
+    }
+  }
+  
+  return {
+    valid: missing.length === 0,
+    missing
+  };
+}
+
+// Ensure the specs directory exists
+function ensureSpecsDir(): void {
+  if (!fs.existsSync(SPECS_DIR)) {
+    fs.mkdirSync(SPECS_DIR, { recursive: true });
+  }
 } 

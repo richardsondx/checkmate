@@ -15,6 +15,55 @@ const execAsync = promisify(exec);
 const SNAPSHOT_FILE = '.checkmate/snap.json';
 
 /**
+ * Error codes for invalid operations
+ */
+export enum ErrorCode {
+  INVALID_PATH = 1001,
+  INVALID_EXTENSION = 1002,
+  FILE_NOT_FOUND = 1003,
+  PERMISSION_DENIED = 1004,
+  GIT_ERROR = 1005,
+  UNKNOWN_ERROR = 9999
+}
+
+/**
+ * Error response object
+ */
+export interface ErrorResponse {
+  code: ErrorCode;
+  message: string;
+  details?: any;
+}
+
+/**
+ * Create a standard error response
+ */
+export function createErrorResponse(code: ErrorCode, message: string, details?: any): ErrorResponse {
+  return { code, message, details };
+}
+
+/**
+ * Send notification on successful completion
+ */
+export function notifySuccess(operation: string, details?: any): void {
+  const timestamp = new Date().toISOString();
+  const notification = {
+    type: 'success',
+    operation,
+    timestamp,
+    details
+  };
+  
+  console.log(`✅ Success notification: ${JSON.stringify(notification)}`);
+  
+  // Could be expanded to send webhooks, emails, or other notifications
+  if (process.env.CHECKMATE_NOTIFY === 'true') {
+    // Send to external notification service
+    console.log('Would send notification to external service if configured');
+  }
+}
+
+/**
  * Run a shell command and return stdout
  */
 async function runCommand(command: string): Promise<string> {

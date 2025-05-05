@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# CheckMate – Full Suite on Push
+- On pushes or merges to main, run the entire test suite.
+- Execute: `checkmate run`
+- Fail the CI step if any spec fails.

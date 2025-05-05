@@ -9,6 +9,7 @@ import stringSimilarity from 'string-similarity';
 import { load as loadConfig } from './config.js';
 import { FeatureStub } from './splitter.js';
 import * as tree from './tree.js';
+import { createEmbedding, cosineSimilarity } from './embeddings.js';
 
 /**
  * Context file interface representing a file with its relevance
@@ -19,12 +20,33 @@ export interface ContextFile {
   reason?: string;
 }
 
+// Cache for file embeddings
+interface EmbeddingCache {
+  [filePath: string]: {
+    embedding: number[];
+    timestamp: number;
+  };
+}
+
+// In-memory cache for embeddings
+let embeddingCache: EmbeddingCache = {};
+
 /**
  * Scan project files and rank them by relevance to a feature
  */
-export async function buildContext(feature: FeatureStub, allFiles?: boolean): Promise<ContextFile[]> {
+export async function buildContext(feature: FeatureStub, allFiles?: boolean, explicitFiles?: string[]): Promise<ContextFile[]> {
   const config = loadConfig();
   const topN = config.context_top_n || 40; // Default to 40 if not specified
+  const useEmbeddings = config.use_embeddings !== false; // Default to true if not specified
+  
+  // If explicit files are provided, use them directly
+  if (explicitFiles && explicitFiles.length > 0) {
+    return explicitFiles.map(filePath => ({
+      path: filePath,
+      relevance: 1.0,
+      reason: 'Explicitly specified file'
+    }));
+  }
   
   // If allFiles is true, scan all file types; otherwise, focus on code files
   const extensions = allFiles 
@@ -54,7 +76,9 @@ export async function buildContext(feature: FeatureStub, allFiles?: boolean): Pr
   const keywords = extractKeywords(`${feature.title} ${feature.description}`);
   
   // Rank files by relevance to the feature keywords
-  const rankedFiles = await rankFilesByRelevance(files, keywords);
+  const rankedFiles = useEmbeddings 
+    ? await rankFilesByEmbeddings(files, `${feature.title} ${feature.description}`) 
+    : await rankFilesByKeywords(files, keywords);
   
   // Take the top N most relevant files
   return rankedFiles.slice(0, topN);
@@ -87,9 +111,9 @@ function extractKeywords(text: string): string[] {
 }
 
 /**
- * Rank files by relevance to the given keywords
+ * Rank files by keyword relevance (TF-IDF style approach)
  */
-async function rankFilesByRelevance(files: string[], keywords: string[]): Promise<ContextFile[]> {
+async function rankFilesByKeywords(files: string[], keywords: string[]): Promise<ContextFile[]> {
   // Prepare array for file scores
   const rankedFiles: ContextFile[] = [];
   
@@ -138,6 +162,110 @@ async function rankFilesByRelevance(files: string[], keywords: string[]): Promis
   
   // Sort files by relevance score (descending)
   return rankedFiles.sort((a, b) => b.relevance - a.relevance);
+}
+
+/**
+ * Rank files using semantic embeddings for better relevance
+ */
+async function rankFilesByEmbeddings(files: string[], featureText: string): Promise<ContextFile[]> {
+  // Generate embedding for the feature description
+  const featureEmbedding = await createEmbedding(featureText);
+  if (!featureEmbedding) {
+    console.warn('Could not create feature embedding. Falling back to keyword matching.');
+    return rankFilesByKeywords(files, extractKeywords(featureText));
+  }
+  
+  // Prepare array for file scores
+  const rankedFiles: ContextFile[] = [];
+  const embedPromises: Promise<void>[] = [];
+  
+  // Process files in batches of 10 to avoid rate limits
+  const batchSize = 10;
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    
+    const batchPromises = batch.map(async (filePath) => {
+      try {
+        // Skip very large files
+        const stats = fs.statSync(filePath);
+        if (stats.size > 1024 * 1024) {
+          return;
+        }
+        
+        // Get file content
+        const fileContent = readFileHead(filePath, 100);
+        if (!fileContent) return;
+        
+        // Calculate traditional keyword score for hybrid approach
+        const keywordScore = calculateHybridKeywordScore(filePath, fileContent, extractKeywords(featureText));
+        
+        // Get or create file embedding
+        let fileEmbedding = await getFileEmbedding(filePath, fileContent);
+        if (!fileEmbedding) return;
+        
+        // Calculate similarity score
+        const similarityScore = cosineSimilarity(featureEmbedding, fileEmbedding);
+        
+        // Hybrid score: 60% embedding similarity, 40% keyword matching
+        const hybridScore = (similarityScore * 0.6) + (keywordScore * 0.4);
+        
+        // Add to ranked files
+        rankedFiles.push({
+          path: filePath,
+          relevance: hybridScore,
+          reason: `Semantic similarity: ${Math.round(similarityScore * 100)}%`
+        });
+      } catch (error) {
+        // Skip this file if there's an error
+      }
+    });
+    
+    embedPromises.push(...batchPromises);
+    
+    // Wait for this batch to complete before moving to the next
+    await Promise.all(batchPromises);
+  }
+  
+  // Sort files by relevance score (descending)
+  return rankedFiles.sort((a, b) => b.relevance - a.relevance);
+}
+
+/**
+ * Get embedding for a file, using cache if available
+ */
+async function getFileEmbedding(filePath: string, fileContent: string): Promise<number[] | null> {
+  const stats = fs.statSync(filePath);
+  const mtime = stats.mtimeMs;
+  
+  // Check if cached embedding exists and is current
+  if (embeddingCache[filePath] && embeddingCache[filePath].timestamp === mtime) {
+    return embeddingCache[filePath].embedding;
+  }
+  
+  // Create new embedding
+  const embedding = await createEmbedding(fileContent);
+  if (embedding) {
+    // Cache the embedding
+    embeddingCache[filePath] = {
+      embedding,
+      timestamp: mtime
+    };
+    return embedding;
+  }
+  
+  return null;
+}
+
+/**
+ * Calculate a combined keyword score for the hybrid approach
+ */
+function calculateHybridKeywordScore(filePath: string, fileContent: string, keywords: string[]): number {
+  const fileName = path.basename(filePath);
+  const fileNameScore = calculateFileNameScore(fileName, keywords);
+  const pathScore = calculatePathScore(filePath, keywords);
+  const contentScore = calculateContentScore(fileContent, keywords).score;
+  
+  return (fileNameScore * 0.4) + (pathScore * 0.2) + (contentScore * 0.4);
 }
 
 /**

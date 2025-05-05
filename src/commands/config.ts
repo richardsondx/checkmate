@@ -4,9 +4,23 @@
 import { printBox } from '../ui/banner.js';
 import { load, save, ensureConfigExists, updateModel, setLogMode as configSetLogMode } from '../lib/config.js';
 import * as cursor from '../lib/cursor.js';
+import * as cursorRules from '../lib/cursorRules.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
+
+/**
+ * Check if any Cursor rule files exist
+ */
+export function hasCursorRuleFiles(): boolean {
+  const CURSOR_RULES_DIR = '.cursor/rules';
+  if (!fs.existsSync(CURSOR_RULES_DIR)) {
+    return false;
+  }
+  
+  const ruleFiles = ['pre-task.mdc', 'post-task.mdc', 'post-push.mdc'];
+  return ruleFiles.some(file => fs.existsSync(path.join(CURSOR_RULES_DIR, file)));
+}
 
 /**
  * Initialize configuration
@@ -34,21 +48,32 @@ export function init(): void {
   // Update .gitignore if needed
   updateGitignore();
   
-  // Process Cursor rules
-  let cursorMessage = '';
+  // Process Cursor config rules
+  let cursorConfigMessage = '';
   
   if (cursor.hasCheckMateRules()) {
-    cursorMessage = 'Cursor rules already exist and were updated.';
+    cursorConfigMessage = 'Cursor config rules already exist and were updated.';
     
     // Update the rules
     cursor.injectCheckMateRules();
   } else {
     const result = cursor.injectCheckMateRules();
     if (result.created) {
-      cursorMessage = 'Created new Cursor rules in .cursor/config.yaml.';
+      cursorConfigMessage = 'Created new Cursor config rules in .cursor/config.yaml.';
     } else {
-      cursorMessage = 'Added CheckMate rules to existing Cursor config.';
+      cursorConfigMessage = 'Added CheckMate rules to existing Cursor config.';
     }
+  }
+  
+  // Generate Cursor .mdc rule files
+  let cursorRulesMessage = '';
+  if (hasCursorRuleFiles()) {
+    // Force regeneration of rule files to ensure they have correct content
+    cursorRules.generateAllRules(true);
+    cursorRulesMessage = 'Updated Cursor rule files (.mdc) in .cursor/rules/';
+  } else {
+    cursorRules.generateAllRules(true);
+    cursorRulesMessage = 'Added Cursor rule files (.mdc) in .cursor/rules/';
   }
   
   // Display confirmation
@@ -56,7 +81,8 @@ export function init(): void {
 CheckMate initialized! 
 
 - Config file created at .checkmate
-- ${cursorMessage}
+- ${cursorConfigMessage}
+- ${cursorRulesMessage}
 - Added checkmate/* to .gitignore
 - Created directory structure for specs
 

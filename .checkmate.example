@@ -1,0 +1,9 @@
+openai_key: sk-proj...
+anthropic_key: sk-ant...
+models:
+  reason: claude-3-7-sonnet-20250219
+  quick: gpt-4o-mini
+tree_cmd: "git ls-files | grep -E '\\\\.(ts|js|tsx|jsx)$'"
+log: optional
+context_top_n: 40
+show_thinking: true

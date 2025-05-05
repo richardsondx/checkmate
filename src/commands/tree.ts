@@ -2,6 +2,7 @@
  * Tree commands for CheckMate CLI
  */
 import * as tree from '../lib/tree.js';
+import { ErrorCode, createErrorResponse, notifySuccess } from '../lib/tree.js';
 
 /**
  * List all code files in the project
@@ -9,12 +10,32 @@ import * as tree from '../lib/tree.js';
 export async function listFiles(extensions: string[] = ['ts', 'js', 'tsx', 'jsx']): Promise<void> {
   try {
     console.log(`Scanning for files with extensions: ${extensions.join(', ')}...`);
+    
+    // Validate input data
+    if (!Array.isArray(extensions) || extensions.length === 0) {
+      const error = createErrorResponse(
+        ErrorCode.INVALID_EXTENSION,
+        'Invalid extensions array provided',
+        { extensions }
+      );
+      console.error('Error:', error);
+      return;
+    }
+    
     const files = await tree.scan(extensions);
     
     console.log(`\nFound ${files.length} files:`);
     files.forEach(file => console.log(`- ${file}`));
+    
+    // Send notification on successful completion
+    notifySuccess('listFiles', { count: files.length });
   } catch (error) {
-    console.error('Error listing files:', error);
+    const errorResponse = createErrorResponse(
+      ErrorCode.UNKNOWN_ERROR,
+      'Error listing files',
+      { error }
+    );
+    console.error('Error:', errorResponse);
   }
 }
 
@@ -29,8 +50,16 @@ export async function listDirectories(): Promise<void> {
     
     console.log(`\nFound ${directories.length} directories with code files:`);
     directories.forEach(dir => console.log(`- ${dir}`));
+    
+    // Send notification on successful completion
+    notifySuccess('listDirectories', { count: directories.length });
   } catch (error) {
-    console.error('Error listing directories:', error);
+    const errorResponse = createErrorResponse(
+      ErrorCode.UNKNOWN_ERROR,
+      'Error listing directories',
+      { error }
+    );
+    console.error('Error:', errorResponse);
   }
 }
 
@@ -39,9 +68,17 @@ export async function listDirectories(): Promise<void> {
  */
 export async function getCodeFiles(): Promise<string[]> {
   try {
-    return await tree.scan();
+    const files = await tree.scan();
+    // Send notification on successful completion
+    notifySuccess('getCodeFiles', { count: files.length });
+    return files;
   } catch (error) {
-    console.error('Error getting code files:', error);
+    const errorResponse = createErrorResponse(
+      ErrorCode.UNKNOWN_ERROR,
+      'Error getting code files',
+      { error }
+    );
+    console.error('Error:', errorResponse);
     return [];
   }
 } 

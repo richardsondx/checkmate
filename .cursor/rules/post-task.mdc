@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# CheckMate – Post‑Task Verification
+- After coding, verify all affected specs.
+- Execute: `checkmate run --target "$CM_LIST" --fail-early`
+- If any bullet fails, stop at the first failing test and fix it.
+- Continue fixing one test at a time until all pass.
+- When all pass, reset boxes (CheckMate handles this internally).

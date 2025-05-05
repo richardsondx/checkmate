@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# CheckMate – Pre‑Task Rules
+- Run **scope analysis** before coding.
+- Execute: `checkmate affected`
+- Store output as `$CM_LIST` for later steps.
+- If the command errors, surface the message and halt.

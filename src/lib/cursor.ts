@@ -15,20 +15,20 @@ const DEFAULT_RULES = {
   pre_task: [
     {
       name: 'cm_scope',
-      cmd: 'checkmate affected',
+      cmd: 'node scripts/cursor-task-wrapper.js pre_task "checkmate affected"',
       env: { CM_LIST: '$OUTPUT' }
     }
   ],
   post_task: [
     {
       name: 'cm_verify',
-      cmd: 'checkmate run --target "$CM_LIST"'
+      cmd: 'node scripts/cursor-task-wrapper.js post_task "checkmate run --target \\"$CM_LIST\\""'
     }
   ],
   post_push: [
     {
       name: 'cm_regress',
-      cmd: 'checkmate run'
+      cmd: 'node scripts/cursor-task-wrapper.js post_push "checkmate run"'
     }
   ]
 };
