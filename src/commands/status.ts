@@ -2,248 +2,214 @@
 
 /**
  * CheckMate Status Command
- * Tests the AI model integration and shows status of specifications
+ * Shows status of specifications and requirements
  */
 
-import { callModel } from '../lib/models.js';
-import { printBanner, printBox } from '../ui/banner.js';
+import { printBanner, printBox, printCompactBanner } from '../ui/banner.js';
 import chalk from 'chalk';
-import { load as loadConfig } from '../lib/config.js';
-import { listSpecs, parseSpec } from '../lib/specs.js';
+import { listSpecs, parseSpec, getSpecByName } from '../lib/specs.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
-function isAnthropicModel(modelName: string): boolean {
-  return modelName.toLowerCase().includes('claude');
-}
-
-function isOpenAIModel(modelName: string): boolean {
-  return modelName.toLowerCase().includes('gpt');
-}
-
 /**
- * Status command with support for checking Type A and Type B specs
+ * Status command to check specification status
  */
-export async function statusCommand(options: { type?: string } = {}): Promise<any> {
+export async function statusCommand(options: { 
+  target?: string, 
+  cursor?: boolean,
+  json?: boolean,
+  quiet?: boolean
+} = {}): Promise<any> {
   // Print welcome banner
-  printBanner();
+  if (!options.quiet) {
+    printCompactBanner('Spec Status');
+  }
   
-  // Load configuration to check which models are being used
-  const config = loadConfig();
-  const reasonModel = config.models.reason;
-  const quickModel = config.models.quick;
+  // Check for required target
+  if (!options.target) {
+    if (!options.quiet) {
+      console.error(chalk.red('❌ No target specified. Use --target to specify a spec.'));
+      console.log('Example: checkmate status --target cursor-integration');
+    }
+    return { error: true, message: 'No target specified' };
+  }
   
-  // Determine which APIs are being used
-  const usesAnthropicAPI = isAnthropicModel(reasonModel) || isAnthropicModel(quickModel);
-  const usesOpenAIAPI = isOpenAIModel(reasonModel) || isOpenAIModel(quickModel);
+  // Get status for a specific spec
+  const specStatus = await getSpecificSpecStatus(options.target);
   
-  // Get status of specifications if requested
-  if (options.type) {
-    console.log(chalk.cyan(`\n⚙️  Getting status of Type ${options.type} specifications...`));
-    
-    // Find all specs of the requested type
-    const status = await getSpecificationStatus(options.type);
-    
-    // Display status information
-    printSpecificationStatus(status, options.type);
-    
-    return status; 
-  } else {
-    // Run model test
-    console.log(chalk.cyan('\n⚙️  Running model test...'));
-    
-    try {
-      // Test the "quick" model
-      console.log(chalk.yellow(`Testing "quick" model (${quickModel}) connection...`));
-      const quickResponse = await callModel(
-        'quick', 
-        'You are a helpful assistant.', 
-        'Say hello in one word.'
-      );
-      console.log(chalk.green('✅ Quick model responded:'), quickResponse);
-      
-      // Test the "reason" model
-      console.log(chalk.yellow(`\nTesting "reason" model (${reasonModel}) connection...`));
-      const reasonResponse = await callModel(
-        'reason', 
-        'You are a helpful assistant.', 
-        'Generate one sentence that describes what CheckMate does.'
-      );
-      console.log(chalk.green('✅ Reason model responded:'), reasonResponse);
-      
-      // Get specs status 
-      const typeAStatus = await getSpecificationStatus('A');
-      const typeBStatus = await getSpecificationStatus('B');
-      
-      // Build API status messages
-      const apiStatusMessages = [];
-      if (usesOpenAIAPI) {
-        apiStatusMessages.push(`✓ OpenAI API connection successful`);
-      }
-      if (usesAnthropicAPI) {
-        apiStatusMessages.push(`✓ Anthropic API connection successful`);
-      }
-      
-      // Build test specification status messages
-      const specStatusMessages = [];
-      
-      specStatusMessages.push(`Type A Specs: ${typeAStatus.total} found, ${typeAStatus.passed} passed, ${typeAStatus.failed} failed`);
-      specStatusMessages.push(`Type B Specs: ${typeBStatus.total} found, ${typeBStatus.passed} passed, ${typeBStatus.failed} failed`);
-      
-      // Success message
-      printBox(`
-CheckMate Status: ${chalk.green('✅ OPERATIONAL')}
-
-${apiStatusMessages.join('\n')}
-✓ Quick model (${quickModel}) working correctly
-✓ Reason model (${reasonModel}) working correctly
-
-Test Specification Status:
-${specStatusMessages.join('\n')}
-
-Your AI-powered TDD is ready to roll! 🚀
-      `);
-      
-      return {
-        typeA: typeAStatus,
-        typeB: typeBStatus
+  if (specStatus.notFound) {
+    if (options.json) {
+      const jsonOutput = {
+        error: true,
+        message: `Spec not found: ${options.target}`
       };
-      
-    } catch (error) {
-      console.error(chalk.red('\n❌ Error connecting to AI model:'), error);
-      
-      // Build error help messages based on which APIs are in use
-      const errorHelp = [];
-      if (usesOpenAIAPI) {
-        errorHelp.push(`- Check your OpenAI API key (${config.openai_key ? 'configured' : 'missing'})`);
+      console.log(JSON.stringify(jsonOutput, null, 2));
+      return jsonOutput;
+    } else if (options.cursor) {
+      console.error(`[CM-FAIL] Could not find spec "${options.target}"`);
+    } else if (!options.quiet) {
+      console.error(chalk.red(`❌ Could not find spec "${options.target}"`));
+      console.log('Run "checkmate specs" to see a list of available specs.');
+    }
+    return { error: true, message: `Spec not found: ${options.target}` };
+  }
+  
+  if (options.json) {
+    // Return machine-readable JSON output
+    const jsonOutput = {
+      spec: specStatus.name,
+      path: specStatus.path,
+      total: specStatus.requirements,
+      passed: specStatus.passed,
+      failed: specStatus.failed,
+      status: specStatus.failed > 0 ? 'FAIL' : 'PASS',
+      exitCode: specStatus.failed > 0 ? 1 : 0,
+      warnings: {
+        hasTrivialTests: specStatus.hasTrivialTests,
+        hasEmptyChecks: specStatus.requirements === 0
       }
-      if (usesAnthropicAPI) {
-        errorHelp.push(`- Check your Anthropic API key (${config.anthropic_key ? 'configured' : 'missing'})`);
+    };
+    
+    console.log(JSON.stringify(jsonOutput, null, 2));
+    return jsonOutput;
+  } else if (options.cursor) {
+    // Output cursor-friendly format
+    if (specStatus.failed > 0) {
+      console.log(`[CM-FAIL] ${specStatus.name}: ${specStatus.passed}/${specStatus.requirements} passed, ${specStatus.failed} failed`);
+    } else if (specStatus.requirements > 0) {
+      console.log(`[CM-PASS] ${specStatus.name}: all ${specStatus.requirements} passed`);
+    } else {
+      console.log(`[CM-WARN] ${specStatus.name}: No requirements found or invalid spec`);
+    }
+  } else if (!options.quiet) {
+    // Output human-readable format
+    const passRate = specStatus.requirements > 0 ? Math.round((specStatus.passed / specStatus.requirements) * 100) : 0;
+    const statusSymbol = specStatus.failed === 0 ? chalk.green('✔') : chalk.red('✖');
+    
+    console.log(chalk.cyan(`\nSpec Status: ${specStatus.name}`));
+    console.log(`${statusSymbol} ${specStatus.passed} / ${specStatus.requirements} requirements passed (${passRate}%)`);
+    
+    if (specStatus.hasTrivialTests) {
+      console.log(chalk.yellow('\n⚠️  Warning: This spec contains trivial test assertions'));
       }
-      errorHelp.push('- Check your internet connection');
-      
-      // Add API status messages
-      const apiServiceMessages = [];
-      if (usesOpenAIAPI) {
-        apiServiceMessages.push('- OpenAI service status');
-      }
-      if (usesAnthropicAPI) {
-        apiServiceMessages.push('- Anthropic service status');
-      }
-      
-      printBox(`
-CheckMate Status: ${chalk.red('❌ ERROR')}
-
-There was a problem connecting to the AI model.
-Please check:
-
-${errorHelp.join('\n')}
-${apiServiceMessages.join('\n')}
-
-Run ${chalk.cyan('checkmate config')} to see your current configuration.
-      `);
-      
-      return { error: true, message: 'Error connecting to AI model' };
+    
+    if (specStatus.requirements === 0) {
+      console.log(chalk.yellow('\n⚠️  Warning: This spec has no requirements'));
+    }
+    
+    // Print list of failed requirements if any
+    if (specStatus.failed > 0 && specStatus.failedRequirements.length > 0) {
+      console.log(chalk.red('\nFailing requirements:'));
+      specStatus.failedRequirements.forEach((req, index) => {
+        console.log(chalk.red(`${index + 1}. ${req.text || req.require || ''}`));
+      });
     }
   }
+  
+  return specStatus;
 }
 
 /**
- * Get status of specifications by type
+ * Get status for a specific spec by name or path
  */
-async function getSpecificationStatus(type: string): Promise<{ total: number; passed: number; failed: number; specs: any[] }> {
-  // Get all specs
-  const allSpecs = listSpecs();
-  const specsOfType: any[] = [];
-  
-  // Parse and filter specs by type
-  for (const specPath of allSpecs) {
-    try {
-      const spec = parseSpec(specPath);
-      
-      // For Type A and Type B, look for specifications in the agent directory
-      if (type === 'A' || type === 'B') {
-        // Check if it's a test-specification-type-X.yaml file
-        const fileName = path.basename(specPath);
-        if (fileName.includes(`test-specification-type-${type.toLowerCase()}`)) {
-          const requirements = spec.requirements || [];
-          const passed = requirements.filter((r: any) => r.status === true).length;
-          const failed = requirements.length - passed;
-          
-          specsOfType.push({
-            path: specPath,
-            name: spec.title,
-            requirements: requirements.length,
-            passed,
-            failed
-          });
+async function getSpecificSpecStatus(specNameOrPath: string): Promise<{
+  name: string;
+  path: string;
+  requirements: number;
+  passed: number;
+  failed: number;
+  hasTrivialTests: boolean;
+  notFound?: boolean;
+  failedRequirements: any[];
+}> {
+  try {
+    // Get the spec path based on name or path
+    const specPaths = await getSpecByName(specNameOrPath);
+    let specPath: string;
+    
+    if (!specPaths || specPaths.length === 0) {
+      // Try treating specNameOrPath as a direct path
+      if (fs.existsSync(specNameOrPath)) {
+        specPath = specNameOrPath;
+      } else {
+        // Spec not found
+        return {
+          name: specNameOrPath,
+          path: '',
+          requirements: 0,
+          passed: 0,
+          failed: 0,
+          hasTrivialTests: false,
+          notFound: true,
+          failedRequirements: []
+        };
+      }
+    } else {
+      // We'll just take the first matching spec if multiple are found
+      specPath = specPaths[0];
         }
-      } else if (type === 'YAML' && (specPath.endsWith('.yaml') || specPath.endsWith('.yml'))) {
-        // For YAML specifications
-        const requirements = spec.requirements || [];
-        const passed = requirements.filter((r: any) => r.status === true).length;
-        const failed = requirements.length - passed;
-        
-        specsOfType.push({
+    
+    // Parse the spec
+    const spec = parseSpec(specPath);
+    const requirements = spec.checks || spec.requirements || [];
+    const passedRequirements = requirements.filter((r: any) => r.status === true);
+    const failedRequirements = requirements.filter((r: any) => !r.status);
+    const passed = passedRequirements.length;
+    const failed = failedRequirements.length;
+    
+    // Check for trivial tests
+    const hasTrivialTests = checkForTrivialTests(requirements);
+    
+    return {
+      name: spec.title || path.basename(specPath, path.extname(specPath)),
           path: specPath,
-          name: spec.title,
           requirements: requirements.length,
           passed,
-          failed
-        });
-      } else if (type === 'MARKDOWN' && specPath.endsWith('.md')) {
-        // For Markdown specifications
-        const requirements = spec.requirements || [];
-        const passed = requirements.filter((r: any) => r.status === true).length;
-        const failed = requirements.length - passed;
-        
-        specsOfType.push({
-          path: specPath,
-          name: spec.title,
-          requirements: requirements.length,
-          passed,
-          failed
-        });
-      }
+      failed,
+      hasTrivialTests,
+      failedRequirements
+    };
     } catch (error) {
-      console.error(`Error parsing spec ${specPath}:`, error);
-    }
+    console.error(`Error parsing spec ${specNameOrPath}:`, error);
+    
+    // Return a spec not found result
+    return {
+      name: specNameOrPath,
+      path: '',
+      requirements: 0,
+      passed: 0,
+      failed: 0,
+      hasTrivialTests: false,
+      notFound: true,
+      failedRequirements: []
+    };
   }
-  
-  // Calculate totals
-  const total = specsOfType.length;
-  const passed = specsOfType.reduce((count, spec) => count + spec.passed, 0);
-  const failed = specsOfType.reduce((count, spec) => count + spec.failed, 0);
-  
-  return { total, passed, failed, specs: specsOfType };
 }
 
 /**
- * Display specification status
+ * Check if the requirements have trivial tests
  */
-function printSpecificationStatus(status: { total: number; passed: number; failed: number; specs: any[] }, type: string): void {
-  console.log(chalk.cyan(`\nType ${type} Specification Status:`));
-  console.log(`Total specs: ${status.total}`);
-  console.log(`Total passed requirements: ${status.passed}`);
-  console.log(`Total failed requirements: ${status.failed}`);
-  
-  if (status.specs.length > 0) {
-    console.log(chalk.yellow('\nIndividual Specifications:'));
-    
-    // Sort specs by name
-    const sortedSpecs = [...status.specs].sort((a, b) => a.name.localeCompare(b.name));
-    
-    // Display each spec status
-    for (const spec of sortedSpecs) {
-      const passRate = spec.requirements > 0 ? Math.round((spec.passed / spec.requirements) * 100) : 0;
-      const statusColor = passRate === 100 ? chalk.green : passRate > 60 ? chalk.yellow : chalk.red;
-      
-      console.log(`${statusColor('■')} ${spec.name} - ${spec.passed}/${spec.requirements} passed (${passRate}%)`);
+function checkForTrivialTests(requirements: any[]): boolean {
+  for (const req of requirements) {
+    if (req.test) {
+      const testContent = req.test.trim();
+      // Look for test blocks that only contain trivial assertions
+      if (
+        testContent === 'return true;' ||
+        testContent === 'return true' ||
+        testContent === 'true;' ||
+        testContent === 'true' ||
+        testContent.endsWith('// Always pass') ||
+        testContent.includes('trivial assertion')
+      ) {
+        return true;
     }
   }
+  }
+  return false;
 }
 
 // When the module is executed directly, run the status command
 if (import.meta.url === `file://${process.argv[1]}`) {
-  await statusCommand();
+  await statusCommand({ target: process.argv[2] });
 } 

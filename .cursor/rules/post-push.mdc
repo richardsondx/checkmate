@@ -3,7 +3,7 @@ description:
 globs: 
 alwaysApply: false
 ---
-# CheckMate – Full Suite on Push
-- On pushes or merges to main, run the entire test suite.
-- Execute: `checkmate run`
-- Fail the CI step if any spec fails.
+# CheckMate – Full Suite on Push
+- On every push or merge into main, run the whole suite
+  - Execute: node scripts/cm-enforce.js run
+- Fail CI if the command prints **[CM‑FAIL]** or exits non‑zero

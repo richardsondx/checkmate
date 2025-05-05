@@ -30,3 +30,10 @@ yarn-error.log*
 *.sln
 *.sw?
 .DS_Store 
+
+# Temporary test scripts
+temp-test-script.js
+*-temp.js
+
+# Spec snapshots
+.checkmate/snapshot.json 

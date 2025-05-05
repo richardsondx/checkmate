@@ -16,7 +16,11 @@
     "status": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/commands/status.ts",
     "mcp": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/mcp/index.ts",
     "setup-mcp": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/commands/setup-mcp.ts",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "spec-snapshot": "node scripts/spec-snapshot.js create",
+    "spec-verify": "node scripts/spec-snapshot.js verify",
+    "spec-diff": "node scripts/spec-snapshot.js diff",
+    "enforce": "node scripts/cm-enforce.js"
   },
   "keywords": [
     "tdd",
@@ -30,6 +34,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/string-similarity": "^4.0.2",
     "@types/yargs": "^17.0.33",
     "boxen": "^8.0.1",
@@ -53,9 +58,13 @@
     "ajv-formats": "^3.0.1",
     "axios": "^1.9.0",
     "better-sqlite3": "^11.9.1",
+    "clipboardy": "^4.0.0",
     "diff": "^7.0.0",
     "dotenv": "^16.5.0",
+    "enquirer": "^2.4.1",
     "fast-glob": "^3.3.3",
+    "glob": "^11.0.2",
+    "js-yaml": "^4.1.0",
     "openai": "^4.29.0",
     "ora": "^8.2.0",
     "rehype-stringify": "^10.0.1",

@@ -36,7 +36,7 @@ const yargsInstance = yargs(hideBin(process.argv));
 
 // Only show welcome banner on init command or when no command is specified
 const command = process.argv.length > 2 ? process.argv[2] : null;
-const showBannerCommands = ['init', null, 'help', '--help', '-h', 'status'];
+const showBannerCommands = ['init', null, 'help', '--help', '-h'];
 if (showBannerCommands.includes(command)) {
   printBanner();
 }
@@ -299,6 +299,11 @@ yargsInstance
           describe: 'Stop execution on the first failing requirement',
           type: 'boolean',
           default: false
+        })
+        .option('cursor', {
+          describe: 'Output in machine-readable format for Cursor integration',
+          type: 'boolean',
+          default: false
         });
     },
     async (argv: any) => {
@@ -309,7 +314,8 @@ yargsInstance
         reset: reset,
         all: !argv.target && !argv.type,
         type: argv.type,
-        failEarly: argv.failEarly || false
+        failEarly: argv.failEarly || false,
+        cursor: argv.cursor || false
       });
     }
   )
@@ -459,21 +465,73 @@ yargsInstance
     }
   )
   
-  // Status command to test AI integration
-  .command('status', 'Test the AI model integration', 
+  // Status command to check spec status
+  .command('status', 'Check status of a specific spec', 
     (yargs: Argv) => {
       return yargs
-        .option('type', {
-          describe: 'Show status for a specific type of specification (A or B)',
+        .option('target', {
+          describe: 'Spec to check status for (name or path)',
           type: 'string',
-          choices: ['A', 'B']
+          demandOption: true,
+          alias: 't'
+        })
+        .option('json', {
+          describe: 'Output as JSON',
+          type: 'boolean',
+          default: false
+        })
+        .option('cursor', {
+          describe: 'Output in machine-readable format for Cursor integration',
+          type: 'boolean',
+          default: false
+        })
+        .option('quiet', {
+          describe: 'Suppress banner and detailed output',
+          type: 'boolean',
+          default: false
         });
     }, 
     async (argv: any) => {
       // Import dynamically to avoid circular dependencies
       const statusModule = await import('./commands/status.js');
       // Call the status command function explicitly
-      await statusModule.statusCommand({ type: argv.type });
+      await statusModule.statusCommand({ 
+        target: argv.target,
+        cursor: argv.cursor || false,
+        json: argv.json || false,
+        quiet: argv.quiet || false
+      });
+    })
+  
+  // Test command to test AI model integration
+  .command('test', 'Test the AI model integration', 
+    (yargs: Argv) => {
+      return yargs
+        .option('cursor', {
+          describe: 'Output in machine-readable format for Cursor integration',
+          type: 'boolean',
+          default: false
+        })
+        .option('json', {
+          describe: 'Output as JSON',
+          type: 'boolean',
+          default: false
+        })
+        .option('quiet', {
+          describe: 'Suppress banner and detailed output',
+          type: 'boolean',
+          default: false
+        });
+    }, 
+    async (argv: any) => {
+      // Import dynamically to avoid circular dependencies
+      const testModule = await import('./commands/test.js');
+      // Call the test command function
+      await testModule.testCommand({ 
+        cursor: argv.cursor || false,
+        json: argv.json || false,
+        quiet: argv.quiet || false
+      });
     })
   
   // Setup MCP command
@@ -934,10 +992,10 @@ yargsInstance
     (yargs: Argv) => {
       return yargs
         .option('output', {
-          describe: 'Output format (json or table)',
+          describe: 'Output format (json, yaml, or table)',
           type: 'string',
-          choices: ['json', 'table'],
-          default: 'json'
+          choices: ['json', 'yaml', 'table'],
+          default: 'yaml'
         })
         .option('top-files', {
           describe: 'Number of top files to include in analysis',
@@ -947,6 +1005,33 @@ yargsInstance
         .option('model', {
           describe: 'Model to use for analysis',
           type: 'string'
+        })
+        .option('yes', {
+          describe: 'Save all specs without interactive selection',
+          type: 'boolean',
+          default: false,
+          alias: 'y'
+        })
+        .option('interactive', {
+          describe: 'Use interactive mode for selection',
+          type: 'boolean',
+          default: true
+        })
+        .option('quiet', {
+          describe: 'Suppress banner and spinner output',
+          type: 'boolean',
+          default: false,
+          alias: 'q'
+        })
+        .option('debug', {
+          describe: 'Show debug information including meta hashes',
+          type: 'boolean',
+          default: false
+        })
+        .option('cursor', {
+          describe: 'Output in machine-readable format for Cursor integration',
+          type: 'boolean',
+          default: false
         });
     },
     async (argv: any) => {
@@ -1021,6 +1106,105 @@ yargsInstance
     async (argv: any) => {
       const clarifyModule = await import('./commands/clarify.js');
       await clarifyModule.clarifyCommand(clarifyModule.parseClarifyArgs(argv));
+    }
+  )
+  
+  // Add the outline command
+  .command(
+    'outline',
+    'Generate a pseudocode outline of implementation and compare with spec',
+    (yargs: Argv) => {
+      return yargs
+        .option('spec', {
+          describe: 'Spec to analyze (name or path)',
+          type: 'string',
+          alias: 's'
+        })
+        .option('files', {
+          describe: 'Files to analyze (glob patterns allowed)',
+          type: 'array',
+          alias: 'f'
+        })
+        .option('diff', {
+          describe: 'Generate diff report comparing spec with implementation',
+          type: 'boolean',
+          default: false,
+          alias: 'd'
+        })
+        .option('depth', {
+          describe: 'Summarization depth (1-3)',
+          type: 'number',
+          default: 2
+        })
+        .option('format', {
+          describe: 'Output format for diff report',
+          type: 'string',
+          choices: ['json', 'markdown'],
+          default: 'markdown'
+        })
+        .option('auto', {
+          describe: 'Auto-detect spec from current context',
+          type: 'boolean',
+          default: false,
+          alias: 'a'
+        })
+        .option('audit', {
+          describe: 'Treat conflicts as failures in CI/CD',
+          type: 'boolean',
+          default: false
+        })
+        .option('quiet', {
+          describe: 'Suppress detailed output',
+          type: 'boolean',
+          default: false,
+          alias: 'q'
+        })
+        .check((argv) => {
+          if (!argv.spec && !argv.auto && !argv.files) {
+            throw new Error('Either --spec, --auto, or --files is required');
+          }
+          return true;
+        });
+    },
+    async (argv: any) => {
+      const outlineModule = await import('./commands/outline.js');
+      await outlineModule.outlineCommand({
+        spec: argv.spec,
+        files: argv.files,
+        diff: argv.diff,
+        depth: argv.depth,
+        format: argv.format as 'json' | 'markdown',
+        auto: argv.auto,
+        audit: argv.audit,
+        quiet: argv.quiet
+      });
+    }
+  )
+  
+  // Add the edit command
+  .command(
+    'edit',
+    'Open a spec file in your preferred editor',
+    (yargs: Argv) => {
+      return yargs
+        .option('target', {
+          describe: 'Spec to edit (name or path)',
+          type: 'string',
+          demandOption: true,
+          alias: 't'
+        })
+        .option('cursor', {
+          describe: 'Output in machine-readable format for Cursor integration',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      const editModule = await import('./commands/edit.js');
+      await editModule.editCommand({
+        target: argv.target,
+        cursor: argv.cursor || false
+      });
     }
   )
   

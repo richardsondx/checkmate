@@ -7,3 +7,12 @@ tree_cmd: "git ls-files | grep -E '\\\\.(ts|js|tsx|jsx)$'"
 log: optional
 context_top_n: 40
 show_thinking: true
+
+# Spec Protection
+protect_specs: true
+spec_snapshot_path: .checkmate/spec-snapshot.json
+
+# Lint Configuration
+lint:
+  empty_checks: error  # Fail when a spec has no meaningful requirements
+  trivial_assert: error  # Fail when test block contains only literals like 'return true'

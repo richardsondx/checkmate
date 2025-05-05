@@ -3,8 +3,9 @@ description:
 globs: 
 alwaysApply: false
 ---
-# CheckMate – Pre‑Task Rules
-- Run **scope analysis** before coding.
-- Execute: `checkmate affected`
-- Store output as `$CM_LIST` for later steps.
-- If the command errors, surface the message and halt.
+# CheckMate – Pre‑Task Scope Analysis
+- Draft a spec if none exists for this prompt  
+  - Execute: checkmate ensure --feature "$TASK_DESCRIPTION" --yes
+- Run **scope analysis** to discover which specs may break  
+  - Execute: checkmate affected --json > .cursor/cm_list.json
+- Halt if either command exits non‑zero

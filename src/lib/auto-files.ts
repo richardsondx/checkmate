@@ -25,11 +25,23 @@ interface FileMeta {
  */
 export async function addMetaToSpec(specPath: string, enableAutoFiles: boolean = true): Promise<void> {
   try {
+    // Check if specPath is a valid file path - if it starts with '{' it's likely JSON content
+    if (specPath.trim().startsWith('{')) {
+      console.warn('Warning: Received JSON content instead of a file path. Skipping meta block addition.');
+      return;
+    }
+
+    // Check if the file exists before trying to read it
+    if (!fs.existsSync(specPath)) {
+      console.warn(`Warning: Spec file does not exist: ${specPath}`);
+      return;
+    }
+    
     // Read the spec file
     const content = fs.readFileSync(specPath, 'utf8');
     
     // Parse the spec
-    const spec = await parseSpec(content);
+    const spec = await parseSpec(specPath);
     
     // Generate hashes for the current files
     const fileHashes: Record<string, string> = {};
@@ -83,12 +95,18 @@ export async function addMetaToSpec(specPath: string, enableAutoFiles: boolean =
  * @param specPath Path to the spec file
  */
 export async function updateAutoFiles(specPath: string): Promise<string[]> {
+  // Safety check for invalid paths
+  if (!specPath || typeof specPath !== 'string' || specPath.trim().startsWith('{') || !fs.existsSync(specPath)) {
+    console.warn(`Cannot update auto-files for invalid spec path: ${specPath}`);
+    return [];
+  }
+  
   try {
     // Read the spec file
     const content = fs.readFileSync(specPath, 'utf8');
     
     // Parse the spec
-    const spec = await parseSpec(content);
+    const spec = await parseSpec(specPath);
     
     // Extract spec attributes for context building
     const featureStub = {
@@ -173,6 +191,11 @@ export async function updateAutoFiles(specPath: string): Promise<string[]> {
  * @param specPath Path to the spec file
  */
 export function hasAutoFileDiscovery(specPath: string): boolean {
+  // Safety check for invalid paths
+  if (!specPath || typeof specPath !== 'string' || specPath.trim().startsWith('{') || !fs.existsSync(specPath)) {
+    return false;
+  }
+  
   try {
     // Read the spec file
     const content = fs.readFileSync(specPath, 'utf8');
@@ -203,11 +226,21 @@ export function hasAutoFileDiscovery(specPath: string): boolean {
  * Enable auto-file discovery for all specs in the project
  */
 export async function enableAutoFilesForAllSpecs(): Promise<void> {
-  const specs = listSpecs();
-  
-  for (const spec of specs) {
-    await addMetaToSpec(spec, true);
-    console.log(`Enabled auto-file discovery for ${spec}`);
+  try {
+    const specs = listSpecs();
+    console.log(`Found ${specs.length} specs to process`);
+    
+    for (const spec of specs) {
+      // Check if spec is a valid path before processing
+      if (typeof spec === 'string' && spec.trim() && !spec.startsWith('{') && fs.existsSync(spec)) {
+        await addMetaToSpec(spec, true);
+        console.log(`Enabled auto-file discovery for ${spec}`);
+      } else {
+        console.warn(`Skipping invalid spec path: ${spec}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error enabling auto-files for all specs:', error);
   }
 }
 
@@ -215,15 +248,26 @@ export async function enableAutoFilesForAllSpecs(): Promise<void> {
  * Update files for all specs with auto-file discovery enabled
  */
 export async function updateAllAutoFiles(): Promise<Record<string, string[]>> {
-  const specs = listSpecs();
   const results: Record<string, string[]> = {};
   
-  for (const spec of specs) {
-    if (hasAutoFileDiscovery(spec)) {
-      const newFiles = await updateAutoFiles(spec);
-      results[spec] = newFiles;
-      console.log(`Updated auto-files for ${spec}`);
+  try {
+    const specs = listSpecs();
+    console.log(`Found ${specs.length} specs to process for auto-file updates`);
+    
+    for (const spec of specs) {
+      // Check if spec is a valid path before processing
+      if (typeof spec === 'string' && spec.trim() && !spec.startsWith('{') && fs.existsSync(spec)) {
+        if (hasAutoFileDiscovery(spec)) {
+          const newFiles = await updateAutoFiles(spec);
+          results[spec] = newFiles;
+          console.log(`Updated auto-files for ${spec}`);
+        }
+      } else {
+        console.warn(`Skipping invalid spec path: ${spec}`);
+      }
     }
+  } catch (error) {
+    console.error('Error updating auto-files for all specs:', error);
   }
   
   return results;

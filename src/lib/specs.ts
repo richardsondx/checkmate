@@ -77,11 +77,19 @@ Feature: ${featureDesc}
 The codebase has the following files:
 ${filesList}
 
-Generate a markdown document with:
+Generate a markdown document with EXACTLY this format:
 1. A title based on the feature description
-2. A list of relevant files from the ones listed above that would be involved in implementing this feature
-3. 4-6 specific, testable checks for this feature (as a checklist with "[ ]" format)
-4. Brief notes with any considerations or implementation details
+2. A section called "## Checks" containing 3-7 specific, testable checks as a checklist with "[ ]" format
+
+IMPORTANT: The ONLY allowed format is:
+# Title
+## Checks
+- [ ] Check 1
+- [ ] Check 2
+- [ ] Check 3
+
+DO NOT include any other sections, headings, or notes.
+DO NOT include a "## Files" or "## Relevant Files" section as we will add this metadata separately.
 
 Return ONLY the markdown content, no explanations or additional text.`;
 
@@ -89,6 +97,16 @@ Return ONLY the markdown content, no explanations or additional text.`;
   const systemPrompt = `You are a senior toolsmith specialized in creating software specifications.
 Your task is to create a detailed spec in markdown format, with clear checks that can be checked programmatically.
 Be specific, actionable, and focus on measurable outcomes.
+
+The specification MUST be a Markdown document with EXACTLY this format:
+1. A title at the top using a single # heading
+2. A section called "## Checks" containing 3-7 specific, testable checks as a checklist with "[ ]" format
+3. NO OTHER sections or headings are allowed
+
+DO NOT include any other headings like "## Implementation Notes", "## Feature Requirements", "## Architecture Considerations", etc.
+DO NOT include a "## Files" or "## Relevant Files" section.
+
+Use clear language and avoid jargon.
 Format your response as a valid Markdown document.`;
 
   try {
@@ -101,25 +119,27 @@ Format your response as a valid Markdown document.`;
     // Write the file
     fs.writeFileSync(filePath, content, 'utf8');
     
-    return { path: filePath, content };
+    // Import the auto-files module to add metadata
+    const autoFilesModule = await import('./auto-files.js');
+    
+    // Add meta information with automatic file discovery
+    await autoFilesModule.addMetaToSpec(filePath, true);
+    
+    // Read the updated content with meta
+    const updatedContent = fs.readFileSync(filePath, 'utf8');
+    
+    return { path: filePath, content: updatedContent };
   } catch (error) {
     console.error('Error generating spec with AI:', error);
     
     // Fallback to a basic template if AI fails
-    const fallbackContent = `# Feature: ${featureDesc}
-
-## Files
-${files.map(file => `- ${file}`).join('\n')}
+    const fallbackContent = `# ${featureDesc}
 
 ## Checks
 - [ ] Validate input data before processing
 - [ ] Return appropriate error codes for invalid requests
 - [ ] Update database with new information
 - [ ] Send notification on successful completion
-
-## Notes
-- Created: ${new Date().toISOString().split('T')[0]}
-- Status: Draft
 `;
     
     // Ensure the specs directory exists
@@ -128,7 +148,16 @@ ${files.map(file => `- ${file}`).join('\n')}
     // Write the fallback file
     fs.writeFileSync(filePath, fallbackContent, 'utf8');
     
-    return { path: filePath, content: fallbackContent };
+    // Import the auto-files module to add metadata
+    const autoFilesModule = await import('./auto-files.js');
+    
+    // Add meta information with automatic file discovery
+    await autoFilesModule.addMetaToSpec(filePath, true);
+    
+    // Read the updated content with meta
+    const updatedContent = fs.readFileSync(filePath, 'utf8');
+    
+    return { path: filePath, content: updatedContent };
   }
 }
 

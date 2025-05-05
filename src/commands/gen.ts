@@ -634,7 +634,32 @@ function getProjectFiles(): string[] {
       .map(line => line.trim())
       .filter(line => line.length > 0 && !line.includes('node_modules'));
   } catch (error) {
-    console.error('Error getting project files:', error);
-    return [];
+    // Instead of showing error, simply log that we're falling back
+    console.log(chalk.yellow('Using filesystem search to discover project files...'));
+    return findFilesRecursive();
   }
+}
+
+/**
+ * Fallback method to find files recursively using the filesystem
+ */
+function findFilesRecursive(dir = '.', fileList: string[] = []): string[] {
+  const files = fs.readdirSync(dir);
+  
+  files.forEach(file => {
+    const filePath = path.join(dir, file);
+    
+    // Skip node_modules
+    if (filePath.includes('node_modules')) {
+      return;
+    }
+    
+    if (fs.statSync(filePath).isDirectory()) {
+      findFilesRecursive(filePath, fileList);
+    } else if (/\.(ts|js|tsx|jsx)$/.test(filePath)) {
+      fileList.push(filePath);
+    }
+  });
+  
+  return fileList;
 }

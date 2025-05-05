@@ -94,3 +94,19 @@ export function printCursorTaskBanner(taskType: string, message: string): void {
   console.log(chalk.hex(borderColor)(`╰${separator}╯`));
   console.log();
 } 
+
+/**
+ * Prints a compact banner for use in commands like status
+ * @param subtitle Optional subtitle to show after the main title
+ */
+export function printCompactBanner(subtitle?: string): void {
+  const text = `✦ CheckMate CLI — AI‑Driven TDD${subtitle ? `: ${subtitle}` : ''} ✦`;
+  const boxLength = text.length + 4; // Add padding
+  const horizontalBorder = chalk.hex('#FFA500')('─'.repeat(boxLength));
+  
+  console.log('');
+  console.log(chalk.hex('#FFA500')(`┌${horizontalBorder}┐`));
+  console.log(chalk.hex('#FFA500')(`│  ${text}  │`));
+  console.log(chalk.hex('#FFA500')(`└${horizontalBorder}┘`));
+  console.log('');
+} 

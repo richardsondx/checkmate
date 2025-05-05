@@ -9,8 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import chalk from 'chalk';
 import { parseSpec, listSpecs, getSpecByName } from '../lib/specs.js';
-import { handleMcpEvent, McpEventType } from '../lib/mcp.js';
-import { logRun, resetSpec } from '../lib/logs.js';
+import { handleMcpEvent, McpEventType } from '../lib/executor.js';
+import { logRun, resetSpec } from '../lib/executor.js';
 import { printBanner, printBox } from '../ui/banner.js';
 import ora from 'ora';
 import { execSync } from 'child_process';
@@ -26,6 +26,7 @@ export async function runCommand(options: {
   noCache?: boolean;
   type?: string;
   failEarly?: boolean;
+  cursor?: boolean;
 }): Promise<void> {
   // Print welcome banner
   printBanner();
@@ -51,7 +52,11 @@ export async function runCommand(options: {
     }
     
     if (!specs.length) {
+      if (options.cursor) {
+        console.log('[CM-FAIL] No specs found to run.');
+      } else {
       console.log('❌ No specs found to run. Use --target to specify a spec or --all to run all.');
+      }
       return;
     }
     
@@ -74,7 +79,8 @@ export async function runCommand(options: {
       const result = await runSpec(specPath, { 
         reset: options.reset, 
         useCache: options.noCache === undefined ? true : !options.noCache,
-        failEarly: options.failEarly
+        failEarly: options.failEarly,
+        cursor: options.cursor
       });
       
       totalPassed += result.passed;
@@ -92,6 +98,15 @@ export async function runCommand(options: {
     }
     
     // Print final summary
+    if (options.cursor) {
+      if (totalFailed > 0) {
+        console.log(`[CM-FAIL] Results: ${totalPassed}/${totalPassed + totalFailed} requirements passed. ${totalFailed} requirements failed.`);
+        process.exitCode = 1; // Set non-zero exit code on failure
+      } else {
+        console.log(`[CM-PASS] All ${totalPassed} requirements passed!`);
+        process.exitCode = 0; // Explicitly set exit code to 0 on success
+      }
+    } else {
     printBox(
       `Results: ${totalPassed}/${totalPassed + totalFailed} requirements passed (${Math.round(totalPassed / (totalPassed + totalFailed) * 100)}%)
       
@@ -100,8 +115,17 @@ ${totalPassed} passed, ${totalFailed} failed
 ${totalFailed > 0 ? '⚠️ Some requirements need attention' : '✅ All requirements passed!'}`
     );
     
+    // Set exit code based on success/failure
+    const success = totalFailed === 0;
+    process.exitCode = success ? 0 : 1;
+    }
+    
   } catch (error) {
+    if (options.cursor) {
+      console.error(`[CM-FAIL] Error running specs: ${error instanceof Error ? error.message : String(error)}`);
+    } else {
     console.error('Error running specs:', error);
+    }
   }
 }
 
@@ -118,6 +142,7 @@ export async function runSpec(specPath: string, options: {
   reset?: boolean;
   useCache?: boolean;
   failEarly?: boolean;
+  cursor?: boolean;
 } = {}): Promise<{
   passed: number;
   failed: number;

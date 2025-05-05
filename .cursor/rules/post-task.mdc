@@ -3,9 +3,9 @@ description:
 globs: 
 alwaysApply: false
 ---
-# CheckMate – Post‑Task Verification
-- After coding, verify all affected specs.
-- Execute: `checkmate run --target "$CM_LIST" --fail-early`
-- If any bullet fails, stop at the first failing test and fix it.
-- Continue fixing one test at a time until all pass.
-- When all pass, reset boxes (CheckMate handles this internally).
+# CheckMate – Post‑Task Verification
+- After coding, verify every spec reported in scope analysis
+  - Execute: node scripts/cm-enforce.js run \
+             --target "$(jq -r '.[]' .cursor/cm_list.json)" \
+             --fail-early
+- Cursor keeps iterating until the command prints **[CM‑PASS]**

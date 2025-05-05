@@ -130,11 +130,13 @@ The specification MUST follow this JSON schema:
   ]
 }
 ` : `
-The specification should be a Markdown document with:
-1. A title based on the feature description
-2. A list of relevant files that would be involved in implementing this feature 
-3. 4-6 specific, testable checks for this feature (as a checklist with "[ ]" format)
-4. Brief notes with any considerations or implementation details
+The specification MUST be a Markdown document with EXACTLY this format:
+1. A title at the top using a single # heading
+2. A section called "## Checks" containing 3-7 specific, testable checks as a checklist with "[ ]" format
+3. NO OTHER sections or headings are allowed
+
+DO NOT include any other headings like "## Implementation Notes", "## Feature Requirements", "## Architecture Considerations", etc.
+DO NOT include a "## Files" or "## Relevant Files" section as this will be handled automatically.
 `}
 
 Follow these guidelines:
@@ -146,7 +148,8 @@ ${options?.agent ? `- Focus on verification: each test must be runnable JavaScri
 - Return valid JSON that will be converted to YAML` : `- Each bullet point should be specific and measurable
 - Checks should be testable in isolation
 - Use clear language and avoid jargon
-- Format checks as a checklist with "[ ]" format`}
+- Format checks as a checklist with "[ ]" format
+- Include ONLY the title and checks sections - no additional sections`}
 
 If the file list provided contains too many files, select only the most relevant ones (max 10).`;
 
@@ -160,14 +163,22 @@ Here are potentially relevant files (ranked by relevance):
 ${filesWithReasons}
 
 Generate a specification that:
-1. Lists only the most relevant files from above (no more than 10)
+${options?.agent ? `1. Lists only the most relevant files from above (no more than 10)
 2. Provides 3-7 concrete, testable checks 
-${options?.agent ? `3. Each test should be executable JavaScript or TypeScript that imports the right modules
+3. Each test should be executable JavaScript or TypeScript that imports the right modules` : 
+`1. Has ONLY two sections: a title and a "## Checks" section
+2. The "## Checks" section should contain 3-7 concrete requirements as a checklist with "[ ]" format
+3. DO NOT include any other sections, headings, or notes
 
-Reply ONLY with the JSON specification object.` : `3. Format checks as a checklist with "[ ]" format
-4. Include any notes or implementation details that would be helpful
+IMPORTANT: The ONLY allowed format is:
+# Title
+## Checks
+- [ ] Check 1
+- [ ] Check 2
+- [ ] Check 3
+`}
 
-${options?.agent ? 'Reply ONLY with the JSON specification object.' : 'Reply ONLY with the Markdown content, no explanations or additional text.'}`}`;
+${options?.agent ? 'Reply ONLY with the JSON specification object.' : 'Reply ONLY with the Markdown content following the exact format specified, no explanations or additional sections.'}`;
 
   try {
     // Call the reasoning model to author the spec
@@ -252,17 +263,26 @@ ${options?.agent ? 'Reply ONLY with the JSON specification object.' : 'Reply ONL
         }
         
         fs.writeFileSync(filePath, result, 'utf8');
+        
+        // Add meta information with automatic file discovery
+        const autoFilesModule = await import('./auto-files.js');
+        await autoFilesModule.addMetaToSpec(filePath, true);
       }
       
+      // For consistent return, always read the content from file if it was written
+      const contentToProcess = !options?.dryRun 
+        ? fs.readFileSync(filePath, 'utf8') 
+        : result;
+      
       // Parse the markdown to extract the spec object for consistent return
-      const spec = parseMarkdownContent(result, feature.title);
+      const spec = parseMarkdownContent(contentToProcess, feature.title);
       
       return {
         path: filePath,
         spec,
         slug: feature.slug,
-        needsMoreContext: result.toLowerCase().includes('more context') || 
-                         result.toLowerCase().includes('additional context')
+        needsMoreContext: contentToProcess.toLowerCase().includes('more context') || 
+                         contentToProcess.toLowerCase().includes('additional context')
       };
     }
   } catch (error) {
@@ -309,10 +329,19 @@ ${options?.agent ? 'Reply ONLY with the JSON specification object.' : 'Reply ONL
         }
         
         fs.writeFileSync(filePath, fallbackMarkdown, 'utf8');
+        
+        // Add meta information with automatic file discovery
+        const autoFilesModule = await import('./auto-files.js');
+        await autoFilesModule.addMetaToSpec(filePath, true);
       }
       
+      // For consistent return, always read the content from file if it was written
+      const contentToProcess = !options?.dryRun 
+        ? fs.readFileSync(filePath, 'utf8') 
+        : fallbackMarkdown;
+      
       // Parse the markdown to extract the spec object for consistent return
-      const spec = parseMarkdownContent(fallbackMarkdown, feature.title);
+      const spec = parseMarkdownContent(contentToProcess, feature.title);
       
       return {
         path: filePath,
@@ -388,23 +417,13 @@ function parseMarkdownContent(content: string, defaultTitle: string): Spec {
  * Create a fallback markdown spec
  */
 function createFallbackMarkdown(feature: FeatureStub, contextFiles: ContextFile[]): string {
-  // Select top files (max 10)
-  const topFiles = contextFiles.slice(0, 10).map(file => file.path);
-  
-  // Create a basic markdown template
-  return `# Feature: ${feature.title}
-
-## Files
-${topFiles.map(file => `- ${file}`).join('\n')}
+  // Create a basic markdown template with the standardized format
+  return `# ${feature.title}
 
 ## Checks
 - [ ] Implement basic structure for ${feature.title}
 - [ ] Process data correctly
 - [ ] Handle edge cases and errors
-
-## Notes
-- Created: ${new Date().toISOString().split('T')[0]}
-- Status: Draft
 `;
 }
 
