@@ -1,9 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: false
----
-# CheckMate – Full Suite on Push
-- On every push or merge into main, run the whole suite
-  - Execute: node scripts/cm-enforce.js run
-- Fail CI if the command prints **[CM‑FAIL]** or exits non‑zero

@@ -21,6 +21,47 @@ Built with Cursor AI integration in mind, but equally valuable as a standalone T
 
 ---
 
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run a specific test
+node tests/unit/test-splitter.mjs
+
+# Check test coverage
+npm run test:coverage
+
+# Run tests and check coverage with interactive mode
+npm run test:all
+```
+
+The test coverage script provides an overview of which commands and scripts have tests and identifies areas for improvement.
+
+See `tests/README.md` for more details on the testing architecture.
+
+### Adding New Tests
+
+To add a new test for a command or script:
+
+1. Run the interactive test coverage tool:
+   ```bash
+   npm run test:all
+   ```
+
+2. When prompted, choose to create tests for uncovered commands
+3. Enter the name of the command or script you want to test
+4. The tool will create a template test file that you can customize
+
+Alternatively, manually create a test file in the appropriate directory:
+- Command tests go in `tests/unit/commands/test-{command-name}.mjs`
+- Script tests go in `tests/unit/scripts/test-{script-name}.mjs`
+
+---
+
 ## Quick Start
 
 ```bash
@@ -57,6 +98,8 @@ CheckMate resets the boxes, logs the pass, and you move on.
 |-------------|---------|
 | **Create a new feature** | Tell Cursor: "Build a todo list app with CheckMate" |
 | **Add a spec for existing code** | `checkmate gen "List all todos"` |
+| **View all tracked features** | `checkmate features` |
+| **Find only failing features** | `checkmate features --fail` |
 | **Monitor test progress** | `checkmate watch` (in a separate terminal) |
 | **See which specs your changes affect** | `checkmate affected` |
 | **Fix a failing spec** | `checkmate clarify user-auth --bullet 3` |
@@ -159,12 +202,13 @@ When you save code changes, Cursor automatically:
 | `checkmate gen -i "<sentence>"` | Interactive spec generation with approval workflow |
 | `checkmate draft "<sentence>"` | Generate spec drafts without writing to disk |
 | `checkmate save --json '<json>'` | Save approved spec drafts to disk |
+| `checkmate features` | List all features tracked by CheckMate |
 | `checkmate run` | Run every check, exit 1 on fail |
 | `checkmate run --target <slug>` | Run a specific spec |
 | `checkmate next` | Run the first unchecked step in the current branch |
 | `checkmate affected` | Print spec names touched by the current diff |
 | `checkmate clarify <slug>` | Explain why a requirement is failing and suggest fixes |
-| `checkmate outline` | Generate feature outlines to understand current implementation |
+| `checkmate audit <slug>` | Compare spec against implementation using action bullets |
 | `checkmate reset <spec-slug>` | Reset the status of a spec back to unchecked state |
 | `checkmate reset --all` | Reset all specs back to unchecked state |
 | `checkmate watch` | Live ASCII dashboard that updates in real-time as specs run |
@@ -174,11 +218,19 @@ When you save code changes, Cursor automatically:
 
 | Command | Options | Description |
 |---------|---------|-------------|
+| `checkmate features` | `--json` | Machine-readable features list |
+| | `--search <term>` | Filter features by title/slug |
+| | `--type USER\|AGENT` | Filter by spec type |
+| | `--status PASS\|FAIL\|STALE` | Filter by status |
+| | `--interactive` | Interactive selection mode |
 | `checkmate watch` | `--filter todo` | Dashboard filtered to specs containing "todo" |
 | | `--spec user-auth` | Focus on a specific spec |
 | | `--status FAIL` | Show only failing specs |
-| | `--type USER\|AGENT` | Filter by spec type |
 | | `--until-pass` | Watch until spec passes |
+| `checkmate audit` | `--warn-only` | Only warn on differences, don't fail |
+| | `--json` | Output in machine-readable format |
+| | `--debug` | Show metadata and file hashes |
+| | `--force` | Force regeneration of action bullets |
 | `checkmate warmup` | `--yes` | Skip interactive mode |
 | | `--output yaml\|json` | Choose output format |
 | `checkmate gen` | `--agent` | Create YAML spec with executable tests |
@@ -274,6 +326,50 @@ Time        Spec                      Type    Total   Status    Pass   Fail
 
 ---
 
+## Documentation
+
+For more detailed information about CheckMate, check out these guides:
+
+- [Getting Started](wiki/Getting-Started.md) - Installation and setup
+- [Quick Start Guide](wiki/Quick-Start-Guide.md) - Create your first spec
+- [Configuration Guide](wiki/Configuration-Guide.md) - Configure CheckMate
+- [Cursor Integration](wiki/Cursor-Integration.md) - Use CheckMate with Cursor
+- [Advanced Features](wiki/Advanced-Features.md) - Power user features
+- [Spec Types](wiki/Spec-Types.md) - User Specs vs Agent Specs
+- [Developer Guide](wiki/Developer-Guide.md) - Contribute to CheckMate
+
+---
+
 ## License
 
 MIT
+
+---
+
+## New: Action Bullets and Audit
+
+The `checkmate audit` command replaces the older `outline` command with a simpler, more focused approach:
+
+### What It Does
+
+- Extracts action bullets (verb + object) from both spec and code
+- Uses the same language format on both sides for meaningful diffs
+- Shows only real gaps between spec and implementation
+- Enables interactive prompts to update spec from code findings
+
+```
+Spec: user-auth
+────────────
+✅ validate credentials
+✅ hash password with bcrypt
+❌ create JWT token         <- missing in code
+⚠️ log login attempt       <- code has, spec missing
+```
+
+### Why It's Better
+
+- **Same language on both sides** → diff is meaningful
+- **One command (`audit`)** → discoverable and memorable
+- **Interactive add-to-spec** keeps specs alive without hand-editing
+- **No meta spam** keeps output readable
+- Works for non-devs: they read plain bullets, press y/n, never touch test code

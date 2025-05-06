@@ -209,6 +209,52 @@ function checkForTrivialTests(requirements: any[]): boolean {
   return false;
 }
 
+/**
+ * Get the status of a spec file
+ * @param specFilename The filename of the spec to get status for
+ * @returns The spec status with checkpoints
+ */
+export async function getSpecStatus(specFilename: string): Promise<{
+  filename: string;
+  title: string;
+  checkpoints: any[];
+}> {
+  // Get the spec path
+  const specPaths = await getSpecByName(specFilename);
+  const specPath = specPaths?.[0] || specFilename;
+  
+  // Parse the spec
+  const spec = parseSpec(specPath);
+  const checkpoints = spec.checks || spec.requirements || [];
+  
+  return {
+    filename: path.basename(specPath),
+    title: spec.title || path.basename(specPath, path.extname(specPath)),
+    checkpoints
+  };
+}
+
+/**
+ * Count completed and remaining checkpoints
+ * @param checkpoints Array of checkpoints
+ * @returns Object with total, completed, and remaining counts
+ */
+export function countCheckpoints(checkpoints: any[]): {
+  total: number;
+  completed: number;
+  remaining: number;
+} {
+  const total = checkpoints.length;
+  const completed = checkpoints.filter((c: any) => c.status === true).length;
+  const remaining = total - completed;
+  
+  return {
+    total,
+    completed,
+    remaining
+  };
+}
+
 // When the module is executed directly, run the status command
 if (import.meta.url === `file://${process.argv[1]}`) {
   await statusCommand({ target: process.argv[2] });

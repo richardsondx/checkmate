@@ -9,7 +9,9 @@
     "checkmate-mcp": "src/mcp/index.ts"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node tests/run-tests.mjs",
+    "test:coverage": "node tests/run-coverage.mjs",
+    "test:all": "./scripts/test-coverage.sh",
     "build": "tsc",
     "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts",
     "checkmate": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts",
@@ -58,6 +60,7 @@
     "ajv-formats": "^3.0.1",
     "axios": "^1.9.0",
     "better-sqlite3": "^11.9.1",
+    "cli-table3": "^0.6.5",
     "clipboardy": "^4.0.0",
     "diff": "^7.0.0",
     "dotenv": "^16.5.0",

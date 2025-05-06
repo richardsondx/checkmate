@@ -5,6 +5,7 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import * as renameDetector from '../lib/rename-detector.js';
+import { createSnapshot } from '../lib/spec-snapshot.js';
 import { printBanner } from '../ui/banner.js';
 
 interface SnapOptions {
@@ -26,7 +27,12 @@ export async function snapCommand(options?: SnapOptions): Promise<void> {
   } else if (options?.detect) {
     await detectRenames();
   } else {
-    console.log(chalk.yellow('\nPlease specify a subcommand:'));
+    // Default action: create snapshot
+    const snapshotPath = createSnapshot();
+    console.log(chalk.green(`\n✅ Created specification snapshot at: ${snapshotPath}`));
+    
+    // Show usage information
+    console.log(chalk.yellow('\nOther available options:'));
     console.log('  checkmate snap --detect   - Detect renamed files');
     console.log('  checkmate snap --repair   - Repair specs with renamed files');
     console.log('  checkmate snap --repair --auto - Automatically repair specs');
@@ -136,6 +142,10 @@ async function repairRenames(auto: boolean): Promise<void> {
     // Apply all changes
     renameDetector.repairAllSpecs(true);
     console.log(chalk.green(`\n✅ Automatically repaired ${updated.length} specs.`));
+    
+    // Create a new snapshot after repairs
+    const snapshotPath = createSnapshot();
+    console.log(chalk.green(`\n✅ Created updated specification snapshot at: ${snapshotPath}`));
     return;
   }
   
@@ -165,6 +175,10 @@ async function repairRenames(auto: boolean): Promise<void> {
   }
   
   console.log(chalk.green('\n✅ Repair process completed.'));
+  
+  // Create a new snapshot after repairs
+  const snapshotPath = createSnapshot();
+  console.log(chalk.green(`\n✅ Created updated specification snapshot at: ${snapshotPath}`));
 }
 
 /**

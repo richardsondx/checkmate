@@ -7,8 +7,9 @@
 
 import * as http from 'http';
 import * as crypto from 'crypto';
+import * as url from 'url';
 import { printBanner } from '../ui/banner.js';
-import { routeEvent } from './router.js';
+import { routeEvent, getFeatures } from './router.js';
 import { load as loadConfig } from '../lib/config.js';
 
 // Print the banner to show we're starting
@@ -49,13 +50,44 @@ function authenticate(req: http.IncomingMessage): boolean {
 }
 
 /**
+ * Handle GET request for features
+ */
+async function handleFeaturesGet(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  try {
+    // Parse query parameters
+    const parsedUrl = url.parse(req.url || '', true);
+    const { search, type, status } = parsedUrl.query;
+    
+    // Get features data
+    const result = getFeatures({
+      search: typeof search === 'string' ? search : undefined,
+      type: typeof type === 'string' ? type : undefined,
+      status: typeof status === 'string' ? status : undefined
+    });
+    
+    // Send response
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(result));
+  } catch (error) {
+    console.error('Error handling features request:', error);
+    res.statusCode = 500;
+    res.end(JSON.stringify({ 
+      success: false,
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : String(error)
+    }));
+  }
+}
+
+/**
  * Create HTTP server to handle MCP events
  */
 function createServer() {
   const server = http.createServer(async (req, res) => {
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
     
     // Handle preflight OPTIONS request
@@ -65,7 +97,20 @@ function createServer() {
       return;
     }
     
-    // Only accept POST requests
+    // Check if this is a GET request for /features
+    if (req.method === 'GET' && req.url?.startsWith('/features')) {
+      // Authenticate the request
+      if (!authenticate(req)) {
+        res.statusCode = 401;
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+      
+      await handleFeaturesGet(req, res);
+      return;
+    }
+    
+    // Only accept POST requests for other paths
     if (req.method !== 'POST') {
       res.statusCode = 405;
       res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -117,6 +162,7 @@ function createServer() {
     console.log(`🔄 Starting CheckMate MCP server on port ${PORT}...`);
     console.log(`🔐 Server authentication token: ${SERVER_TOKEN}`);
     console.log(`🔍 Waiting for Cursor events...`);
+    console.log(`📊 Features endpoint available at: http://localhost:${PORT}/features`);
     
     // Log instructions
     console.log('\n📝 To use with Cursor, add the following to your .cursor/config.json:');

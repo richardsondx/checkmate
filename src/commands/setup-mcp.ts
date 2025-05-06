@@ -26,13 +26,34 @@ interface MCPConfig {
   [key: string]: any;
 }
 
-async function setupMcp() {
+interface SetupOptions {
+  port?: number;
+  yes?: boolean;
+}
+
+/**
+ * Set up MCP for CheckMate
+ * @param projectDir Directory to set up MCP in
+ * @param options Setup options
+ */
+export async function setupMCP(projectDir: string, options: SetupOptions = {}) {
   console.log(chalk.cyan('🔧 Setting up CheckMate MCP for Cursor...'));
   
+  const basePath = projectDir || process.cwd();
+  const configDir = path.join(basePath, CURSOR_CONFIG_DIR);
+  const configFile = path.join(basePath, CURSOR_CONFIG_FILE);
+  
   // Ensure .cursor directory exists
-  if (!fs.existsSync(CURSOR_CONFIG_DIR)) {
-    fs.mkdirSync(CURSOR_CONFIG_DIR, { recursive: true });
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
     console.log(chalk.green(`✅ Created ${CURSOR_CONFIG_DIR} directory`));
+  }
+  
+  // Create MCP directory if it doesn't exist
+  const mcpDir = path.join(basePath, 'mcp');
+  if (!fs.existsSync(mcpDir)) {
+    fs.mkdirSync(mcpDir, { recursive: true });
+    console.log(chalk.green(`✅ Created mcp directory`));
   }
   
   // Load CheckMate config to get API keys if available
@@ -62,6 +83,9 @@ async function setupMcp() {
     envVars.ANTHROPIC_API_KEY = anthropicKey;
   }
   
+  // Set port if provided
+  const port = options.port || 3050;
+  
   // Create MCP configuration
   const mcpConfig: MCPConfig = {
     mcpServers: {
@@ -77,9 +101,9 @@ async function setupMcp() {
   
   // Check if config file already exists
   let existingConfig: MCPConfig = {};
-  if (fs.existsSync(CURSOR_CONFIG_FILE)) {
+  if (fs.existsSync(configFile)) {
     try {
-      const configContent = fs.readFileSync(CURSOR_CONFIG_FILE, 'utf8');
+      const configContent = fs.readFileSync(configFile, 'utf8');
       existingConfig = JSON.parse(configContent) as MCPConfig;
       console.log(chalk.yellow('⚠️ Existing Cursor config found, merging with new settings...'));
     } catch (error) {
@@ -99,12 +123,37 @@ async function setupMcp() {
   
   // Write the config file
   fs.writeFileSync(
-    CURSOR_CONFIG_FILE,
+    configFile,
     JSON.stringify(newConfig, null, 2),
     'utf8'
   );
   
   console.log(chalk.green(`✅ Updated ${CURSOR_CONFIG_FILE} with CheckMate MCP configuration`));
+  
+  // Update .checkmate config to include MCP settings
+  const checkmatePath = path.join(basePath, '.checkmate');
+  if (fs.existsSync(checkmatePath)) {
+    try {
+      const checkmateContent = fs.readFileSync(checkmatePath, 'utf8');
+      const checkmateJson = JSON.parse(checkmateContent);
+      
+      // Add MCP configuration
+      checkmateJson.mcp = {
+        port,
+        enabled: true
+      };
+      
+      fs.writeFileSync(
+        checkmatePath,
+        JSON.stringify(checkmateJson, null, 2),
+        'utf8'
+      );
+      
+      console.log(chalk.green(`✅ Updated .checkmate configuration with MCP settings`));
+    } catch (error) {
+      console.warn(chalk.yellow(`⚠️ Error updating .checkmate config: ${error}`));
+    }
+  }
   
   // Display success message with info about used models
   printBox(`
@@ -130,5 +179,12 @@ Try ${chalk.cyan('npm run status')} to verify your AI configuration.
 `);
 }
 
-// Run the setup
-setupMcp(); 
+// Function for running as a command
+async function setupMcpCommand() {
+  await setupMCP(process.cwd());
+}
+
+// Run the setup when executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  setupMcpCommand();
+} 

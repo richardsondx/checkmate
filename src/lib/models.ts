@@ -74,6 +74,11 @@ export async function callModel(
   systemPrompt: string,
   userPrompt: string
 ): Promise<string> {
+  // Check if we're in a test environment
+  if (process.env.TEST_ENV === 'true') {
+    return mockCallModel(slot, systemPrompt, userPrompt);
+  }
+  
   const config = loadConfig();
   const modelName = config.models[slot];
   
@@ -92,6 +97,24 @@ export async function callModel(
   } catch (error) {
     console.error(`Error calling ${slot} model:`, error);
     throw error;
+  }
+}
+
+/**
+ * Mock implementation for tests to avoid actual API calls
+ */
+function mockCallModel(slot: 'reason' | 'quick', systemPrompt: string, userPrompt: string): string {
+  console.log(`[TEST] Mock model call to ${slot} with prompt: ${userPrompt.substring(0, 50)}...`);
+  
+  if (slot === 'quick') {
+    return "pass This is a mock response for testing purposes";
+  } else {
+    // For reason model, return a JSON structure
+    return JSON.stringify({
+      suggestion: "This is a mock suggestion for testing",
+      next_action: "fix-code",
+      reason: "This is a mock reason for testing"
+    });
   }
 }
 
@@ -192,12 +215,13 @@ Answer with just "pass" or "fail" followed by a single sentence explanation.`;
  */
 export async function testModelIntegration(): Promise<boolean> {
   try {
-    const response = await callModel(
-      'quick', 
-      'You are a test assistant.',
-      'Reply with "TEST_SUCCESS" to confirm you are working.'
-    );
+    // If in test environment, return success without actual API calls
+    if (process.env.TEST_ENV === 'true') {
+      console.log('Model response: TEST_SUCCESS (mock)');
+      return true;
+    }
     
+    const response = await callModel('quick', 'You are a test assistant.', 'Reply with "TEST_SUCCESS" to confirm you are working.');
     console.log('Model response:', response);
     return response.includes('TEST_SUCCESS');
   } catch (error) {

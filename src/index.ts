@@ -26,6 +26,8 @@ import * as snapCommands from './commands/snap.js';
 import * as draftCommands from './commands/draft.js';
 import * as saveCommands from './commands/save.js';
 import * as autoFilesCommands from './commands/auto-files.js';
+import * as featuresCommands from './commands/features.js';
+import chalk from 'chalk';
 
 // Initialize yargs parser
 const yargsInstance = yargs(hideBin(process.argv));
@@ -123,10 +125,70 @@ yargsInstance
     }
   )
   
+  // USER COMMANDS - Feature Listing and Management
+  .command(
+    'features',
+    'List and manage features tracked by CheckMate',
+    (yargs: Argv) => {
+      return yargs
+        .option('json', {
+          describe: 'Output as JSON',
+          type: 'boolean',
+          default: false
+        })
+        .option('search', {
+          describe: 'Filter features by search term',
+          type: 'string',
+          alias: 's'
+        })
+        .option('type', {
+          describe: 'Filter by spec type (USER or AGENT)',
+          type: 'string',
+          choices: ['USER', 'AGENT']
+        })
+        .option('status', {
+          describe: 'Filter by status (PASS, FAIL, STALE, UNKNOWN)',
+          type: 'string',
+          choices: ['PASS', 'FAIL', 'STALE', 'UNKNOWN']
+        })
+        .option('pass', {
+          describe: 'Show only passing features',
+          type: 'boolean',
+          default: false
+        })
+        .option('fail', {
+          describe: 'Show only failing features',
+          type: 'boolean',
+          default: false
+        })
+        .option('stale', {
+          describe: 'Show only stale features',
+          type: 'boolean',
+          default: false
+        })
+        .option('interactive', {
+          describe: 'Enable interactive mode for selection',
+          type: 'boolean'
+        });
+    },
+    async (argv: any) => {
+      await featuresCommands.featuresCommand({
+        json: argv.json,
+        search: argv.search,
+        type: argv.type,
+        status: argv.status,
+        interactive: argv.interactive,
+        fail: argv.fail,
+        pass: argv.pass,
+        stale: argv.stale
+      });
+    }
+  )
+  
   // USER COMMANDS - Specification Creation
   .command(
     'gen <description>',
-    '[USER] Generate a new spec from a description', 
+    'Generate a new spec from a description', 
     (yargs: Argv) => {
       return yargs
         .positional('description', {
@@ -194,7 +256,7 @@ yargsInstance
   // USER COMMANDS - Specification Creation (Alternative methods)
   .command(
     'scaffold <path>',
-    '[USER] Create a spec scaffold with the new YAML format',
+    'Create a spec scaffold with the new YAML format',
     (yargs: Argv) => {
       return yargs
         .positional('path', {
@@ -233,7 +295,7 @@ yargsInstance
   // USER COMMANDS - Create from existing content
   .command(
     'create',
-    '[USER] Create a spec from JSON payload or PRD file',
+    'Create a spec from JSON payload or PRD file',
     (yargs: Argv) => {
       return yargs
         .option('json', {
@@ -274,7 +336,7 @@ yargsInstance
   // USER COMMANDS - Draft & Save (Two-step creation process)
   .command(
     'draft',
-    '[USER] Generate draft specifications without writing to disk',
+    'Generate draft specifications without writing to disk',
     (yargs: Argv) => {
       return yargs
         .option('description', {
@@ -315,7 +377,7 @@ yargsInstance
   
   .command(
     'save',
-    '[USER] Save approved draft specifications to disk',
+    'Save approved draft specifications to disk',
     (yargs: Argv) => {
       return yargs
         .option('json', {
@@ -349,7 +411,7 @@ yargsInstance
   // USER COMMANDS - Testing & Validation
   .command(
     'run',
-    '[USER] Run all checks for all specs', 
+    'Run all checks for all specs', 
     (yargs: Argv) => {
       return yargs
         .option('noreset', {
@@ -392,7 +454,7 @@ yargsInstance
   )
   .command(
     'next [spec]',
-    '[USER] Run the next unchecked requirement in a spec', 
+    'Run the next unchecked requirement in a spec', 
     (yargs: Argv) => {
       return yargs
         .positional('spec', {
@@ -445,7 +507,7 @@ yargsInstance
   // USER COMMANDS - Monitoring & Analysis
   .command(
     'affected',
-    '[USER] Show specs affected by changes', 
+    'Show specs affected by changes', 
     (yargs: Argv) => {
       return yargs
         .option('base', {
@@ -469,7 +531,7 @@ yargsInstance
   // USER COMMANDS - Live Monitoring
   .command(
     'watch',
-    '[USER] Start a live dashboard that monitors test runs',
+    'Start a live dashboard that monitors test runs',
     (yargs: Argv) => {
       return yargs
         .option('filter', {
@@ -518,7 +580,7 @@ yargsInstance
   // USER COMMANDS - Maintenance
   .command(
     'clean',
-    '[USER] Clean the cache by removing entries for deleted specs',
+    'Clean the cache by removing entries for deleted specs',
     (yargs: Argv) => {
       return yargs
         .option('force', {
@@ -537,7 +599,7 @@ yargsInstance
   )
   
   // USER COMMANDS - Status Check
-  .command('status', '[USER] Check status of a specific spec', 
+  .command('status', 'Check status of a specific spec', 
     (yargs: Argv) => {
       return yargs
         .option('target', {
@@ -575,7 +637,7 @@ yargsInstance
     })
   
   // SYSTEM COMMANDS - Testing
-  .command('test', '[SYSTEM] Test the AI model integration', 
+  .command('test', 'Test the AI model integration', 
     (yargs: Argv) => {
       return yargs
         .option('cursor', {
@@ -606,7 +668,7 @@ yargsInstance
     })
   
   // SYSTEM COMMANDS - Setup
-  .command('setup-mcp', '[SYSTEM] Set up CheckMate as a Cursor MCP server', {}, async () => {
+  .command('setup-mcp', 'Set up CheckMate as a Cursor MCP server', {}, async () => {
     // Import dynamically to avoid circular dependencies
     const setupModule = await import('./commands/setup-mcp.js');
     // The setup module has a self-executing function
@@ -615,7 +677,7 @@ yargsInstance
   // SYSTEM COMMANDS - Model Management
   .command({
     command: 'model <command>',
-    describe: '[SYSTEM] Manage AI models',
+    describe: 'Manage AI models',
     builder: (yargs: Argv) => {
       return yargs
         .command({
@@ -662,7 +724,7 @@ yargsInstance
   // AGENT COMMANDS - Promotion from user to agent spec
   .command(
     'promote',
-    '[AGENT] Promote a Markdown spec to a YAML agent spec',
+    'Promote a Markdown spec to a YAML agent spec',
     (yargs: Argv) => {
       return yargs
         .option('spec', {
@@ -688,7 +750,7 @@ yargsInstance
   // SYSTEM COMMANDS - Advanced File Management
   .command(
     'snap',
-    '[SYSTEM] Manage file snapshots and detect renames',
+    'Manage file snapshots and detect renames',
     (yargs: Argv) => {
       return yargs
         .option('detect', {
@@ -719,7 +781,7 @@ yargsInstance
   // USER COMMANDS - Project Analysis
   .command(
     'warmup',
-    '[USER] Scan a repository and suggest specs for existing code',
+    'Scan a repository and suggest specs for existing code',
     (yargs: Argv) => {
       return yargs
         .option('output', {
@@ -774,7 +836,7 @@ yargsInstance
   // USER COMMANDS - File Management
   .command(
     'auto-files',
-    '[USER] Manage automatic file discovery for specs',
+    'Manage automatic file discovery for specs',
     (yargs: Argv) => {
       return yargs
         .option('enable', {
@@ -816,7 +878,7 @@ yargsInstance
   // USER COMMANDS - Analysis & Explanation
   .command(
     'clarify <slug>',
-    '[USER] Explain why a requirement is failing and suggest fixes',
+    'Explain why a requirement is failing and suggest fixes',
     (yargs: Argv) => {
       return yargs
         .positional('slug', {
@@ -842,14 +904,80 @@ yargsInstance
   
   // USER COMMANDS - Implementation Analysis
   .command(
-    'outline',
-    '[USER] Generate a pseudocode outline of implementation and compare with spec',
+    'audit [spec]',
+    'Compare spec against implementation with smart action bullets',
     (yargs: Argv) => {
       return yargs
-        .option('spec', {
+        .positional('spec', {
+          describe: 'Spec to audit (name or path)',
+          type: 'string'
+        })
+        .option('files', {
+          describe: 'Files to analyze (glob patterns allowed)',
+          type: 'array',
+          alias: 'f'
+        })
+        .option('json', {
+          describe: 'Output as JSON',
+          type: 'boolean',
+          default: false
+        })
+        .option('quiet', {
+          describe: 'Suppress detailed output',
+          type: 'boolean',
+          default: false,
+          alias: 'q'
+        })
+        .option('debug', {
+          describe: 'Show debug information including file hashes and meta info',
+          type: 'boolean',
+          default: false
+        })
+        .option('force', {
+          describe: 'Force regeneration of action bullets',
+          type: 'boolean',
+          default: false
+        })
+        .option('warn-only', {
+          describe: 'Only warn on differences, don\'t fail',
+          type: 'boolean',
+          default: false
+        })
+        .check((argv) => {
+          // Ensure the positional argument gets assigned as spec when used
+          if (argv._.length > 1 && argv._[1] && !argv.spec && !argv.s) {
+            argv.spec = argv._[1].toString();
+          }
+          
+          if (!argv.spec) {
+            throw new Error('A spec name is required');
+          }
+          return true;
+        });
+    },
+    async (argv: any) => {
+      const auditModule = await import('./commands/audit.js');
+      await auditModule.auditCommand({
+        spec: argv.spec,
+        files: argv.files,
+        json: argv.json,
+        quiet: argv.quiet,
+        debug: argv.debug,
+        force: argv.force,
+        warnOnly: argv.warnOnly
+      });
+    }
+  )
+  
+  // USER COMMANDS - Implementation Analysis (Legacy - will be removed)
+  .command(
+    'outline [spec]',
+    'Legacy: Generate a pseudocode outline of implementation (use audit instead)',
+    (yargs: Argv) => {
+      return yargs
+        .positional('spec', {
           describe: 'Spec to analyze (name or path)',
-          type: 'string',
-          alias: 's'
+          type: 'string'
         })
         .option('files', {
           describe: 'Files to analyze (glob patterns allowed)',
@@ -859,7 +987,7 @@ yargsInstance
         .option('diff', {
           describe: 'Generate diff report comparing spec with implementation',
           type: 'boolean',
-          default: false,
+          default: true,
           alias: 'd'
         })
         .option('depth', {
@@ -890,14 +1018,26 @@ yargsInstance
           default: false,
           alias: 'q'
         })
+        .option('force', {
+          describe: 'Force regeneration even if outline exists',
+          type: 'boolean',
+          default: false
+        })
         .check((argv) => {
+          // Ensure the positional argument gets assigned as spec when used
+          if (argv._.length > 1 && argv._[1] && !argv.spec && !argv.s) {
+            argv.spec = argv._[1].toString();
+          }
+          
           if (!argv.spec && !argv.auto && !argv.files) {
-            throw new Error('Either --spec, --auto, or --files is required');
+            throw new Error('Either a spec name, --spec, --auto, or --files is required');
           }
           return true;
         });
     },
     async (argv: any) => {
+      console.log(chalk.yellow('⚠️ The outline command is deprecated. Please use `checkmate audit` instead for better results.'));
+      
       const outlineModule = await import('./commands/outline.js');
       await outlineModule.outlineCommand({
         spec: argv.spec,
@@ -907,7 +1047,8 @@ yargsInstance
         format: argv.format as 'json' | 'markdown',
         auto: argv.auto,
         audit: argv.audit,
-        quiet: argv.quiet
+        quiet: argv.quiet,
+        force: argv.force
       });
     }
   )
@@ -915,7 +1056,7 @@ yargsInstance
   // USER COMMANDS - Spec Editing
   .command(
     'edit',
-    '[USER] Open a spec file in your preferred editor',
+    'Open a spec file in your preferred editor',
     (yargs: Argv) => {
       return yargs
         .option('target', {

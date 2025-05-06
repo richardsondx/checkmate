@@ -7,6 +7,7 @@ import { execSync } from 'child_process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { handleMcpEvent, McpEventType } from '../lib/executor.js';
+import { getFeaturesData } from '../commands/features.js';
 
 /**
  * Response interface for MCP responses
@@ -18,6 +19,34 @@ interface McpResponse {
   error?: string;
   details?: any;
   ok?: boolean;
+}
+
+/**
+ * Get features data for Cursor integration
+ */
+export function getFeatures(options: {
+  search?: string;
+  type?: string;
+  status?: string;
+} = {}): McpResponse {
+  try {
+    const features = getFeaturesData(options);
+    
+    return {
+      success: true,
+      message: `Retrieved ${features.length} features`,
+      details: { features }
+    };
+  } catch (error) {
+    console.error('❌ Error getting features:', error);
+    
+    return { 
+      success: false, 
+      message: 'Error getting features',
+      error: error instanceof Error ? error.message : String(error),
+      details: { error }
+    };
+  }
 }
 
 /**
@@ -136,6 +165,16 @@ export async function routeEvent(event: any): Promise<McpResponse> {
     let result: McpResponse;
     
     switch (event?.type) {
+      case 'features.list':
+        // Handle features listing request
+        console.log('📊 Getting features list');
+        result = getFeatures({
+          search: event.search,
+          type: event.type,
+          status: event.status
+        });
+        break;
+        
       case 'task.started':
         if (event.task?.description) {
           console.log(`📝 Generating spec for: "${event.task.description}"`);

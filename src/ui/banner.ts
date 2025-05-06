@@ -36,7 +36,7 @@ export function printBanner(): void {
   console.log([boxTop, welcome, subtext, boxBottom].join('\n'));
   
   // Print ASCII art logo
-  console.log(chalk.cyan(asciiArt));
+  console.log(chalk.green(asciiArt));
   
   // Print help text
   console.log(chalk.white(helpText));

@@ -382,9 +382,17 @@ export function listSpecs(): string[] {
 
 /**
  * Get a spec by name (slug)
+ * Returns an array of matching specs
  */
-export function getSpecByName(name: string): string | null {
+export async function getSpecByName(name: string): Promise<string[]> {
   ensureSpecsDir();
+  const matches: string[] = [];
+  
+  // BUGFIX: Ensure name is properly cast to string
+  if (typeof name !== 'string') {
+    console.log(`Warning: getSpecByName received non-string value: ${name}, type: ${typeof name}`);
+    name = String(name);
+  }
   
   // Check if name already includes a supported extension
   const hasExtension = ['.md', '.yaml', '.yml'].some(ext => name.endsWith(ext));
@@ -392,33 +400,62 @@ export function getSpecByName(name: string): string | null {
   if (hasExtension) {
     const specPath = path.join(SPECS_DIR, name);
     if (fs.existsSync(specPath)) {
-      return specPath;
+      matches.push(specPath);
+      return matches;
     }
   } else {
     // Try with each extension
     for (const ext of ['.md', '.yaml', '.yml']) {
       const specPath = path.join(SPECS_DIR, `${name}${ext}`);
       if (fs.existsSync(specPath)) {
-        return specPath;
+        matches.push(specPath);
+        // Continue checking other extensions to find all potential matches
       }
+    }
+    
+    if (matches.length > 0) {
+      return matches;
     }
   }
   
-  // Try to find a partial match
-  const files = fs.readdirSync(SPECS_DIR).filter(file => 
-    file.endsWith('.md') || file.endsWith('.yaml') || file.endsWith('.yml')
-  );
+  // Find all specs for fuzzy matching
+  const files = glob.sync(`${SPECS_DIR}/**/*.{md,markdown,yaml,yml}`, { absolute: true });
   
-  const match = files.find(file => {
+  // Try exact match against basenames first
+  const exactMatches = files.filter(file => {
+    const baseName = path.basename(file, path.extname(file));
+    return baseName === name;
+  });
+  
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+  
+  // Try to find partial matches
+  const partialMatches = files.filter(file => {
     const baseName = path.basename(file, path.extname(file));
     return baseName.toLowerCase().includes(name.toLowerCase());
   });
   
-  if (match) {
-    return path.join(SPECS_DIR, match);
+  // If we still don't have matches, try matching against titles
+  if (partialMatches.length === 0) {
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(file, 'utf8');
+        const titleMatch = content.match(/# (?:Feature: )?(.*?)(?=\n|$)/);
+        if (titleMatch) {
+          const title = titleMatch[1].trim();
+          if (title.toLowerCase().includes(name.toLowerCase())) {
+            matches.push(file);
+          }
+        }
+      } catch (error) {
+        // Skip files that can't be read
+      }
+    }
   }
   
-  return null;
+  return partialMatches.length > 0 ? partialMatches : matches;
 }
 
 /**

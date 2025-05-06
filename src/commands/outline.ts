@@ -14,6 +14,9 @@ import { getFileContent, getRelevantFiles } from '../lib/files.js';
 import { aiSummarize } from '../lib/ai-client.js';
 import { createTwoColumnMarkdownTable } from '../ui/markdown.js';
 
+// Directory where implementation outlines are stored
+const IMPLEMENTATIONS_DIR = 'checkmate/implementations';
+
 interface OutlineCommandOptions {
   spec?: string;
   files?: string[];
@@ -23,6 +26,7 @@ interface OutlineCommandOptions {
   auto?: boolean;
   audit?: boolean;
   quiet?: boolean;
+  force?: boolean; // Force regeneration of outline
 }
 
 /**
@@ -39,6 +43,7 @@ export async function outlineCommand(options: OutlineCommandOptions = {}): Promi
     if (!options.quiet) {
       console.error(chalk.red('❌ No spec specified. Use --spec to specify a spec or --auto for auto-detection.'));
       console.log('Example: checkmate outline --spec user-auth');
+      console.log('   OR simply: checkmate outline user-auth');
     }
     return { error: true, message: 'No spec specified' };
   }
@@ -59,113 +64,197 @@ export async function outlineCommand(options: OutlineCommandOptions = {}): Promi
   
   // Get the spec path based on name or path
   if (options.spec) {
-    const specPaths = await getSpecByName(options.spec);
-    
-    if (!specPaths || specPaths.length === 0) {
-      // Try treating specName as a direct path
-      if (fs.existsSync(options.spec)) {
-        specPath = options.spec;
-      } else {
-        // Spec not found
-        if (!options.quiet) {
-          console.error(chalk.red(`❌ Could not find spec "${options.spec}"`));
-          console.log('Run "checkmate specs" to see a list of available specs.');
-        }
-        return { error: true, message: `Spec not found: ${options.spec}` };
-      }
-    } else {
-      // We'll just take the first matching spec if multiple are found
-      specPath = specPaths[0];
-    }
-    
-    // Parse the spec
     try {
-      specData = parseSpec(specPath as string);
+      const specPaths = await getSpecByName(options.spec);
+      
+      if (!specPaths || specPaths.length === 0) {
+        // Try treating specName as a direct path
+        if (fs.existsSync(options.spec)) {
+          specPath = options.spec;
+        } else {
+          // Spec not found
+          if (!options.quiet) {
+            console.error(chalk.red(`❌ Could not find spec "${options.spec}"`));
+            console.log('Run "checkmate specs" to see a list of available specs.');
+          }
+          return { error: true, message: `Spec not found: ${options.spec}` };
+        }
+      } else if (specPaths.length === 1) {
+        // Exactly one match found
+        specPath = specPaths[0];
+        if (!options.quiet) {
+          console.log(chalk.green(`✅ Found spec: ${path.basename(specPath)}`));
+        }
+      } else {
+        // Multiple matches found, ask user to select one
+        if (!options.quiet) {
+          console.log(chalk.yellow(`Found ${specPaths.length} potential matches for "${options.spec}":`));
+          
+          // Show the matches with numbers
+          specPaths.forEach((specFilePath, index) => {
+            const basename = path.basename(specFilePath);
+            const relativePath = path.relative(process.cwd(), specFilePath);
+            console.log(`  ${index + 1}. ${chalk.cyan(basename)} (${relativePath})`);
+          });
+          
+          // Use first match by default if in non-interactive context
+          console.log(chalk.yellow(`\nUsing the first match: ${path.basename(specPaths[0])}`));
+          console.log(`To select a different match, specify the full name: ${chalk.cyan(`checkmate outline ${path.basename(specPaths[0], path.extname(specPaths[0]))}`)})`);
+          
+          specPath = specPaths[0];
+        } else {
+          // In quiet mode, just use the first match
+          specPath = specPaths[0];
+        }
+      }
+      
+      // Parse the spec
+      try {
+        specData = parseSpec(specPath as string);
+      } catch (error) {
+        if (!options.quiet) {
+          console.error(chalk.red(`❌ Error parsing spec: ${(error as Error).message}`));
+          // Print more details to help debug the issue
+          console.error(`  Path: ${specPath}`);
+          if (fs.existsSync(specPath as string)) {
+            console.error(`  File exists: Yes`);
+          } else {
+            console.error(`  File exists: No`);
+          }
+        }
+        return { error: true, message: `Error parsing spec: ${(error as Error).message}` };
+      }
     } catch (error) {
       if (!options.quiet) {
-        console.error(chalk.red(`❌ Error parsing spec: ${(error as Error).message}`));
+        console.error(chalk.red(`❌ Error searching for spec: ${(error as Error).message}`));
       }
-      return { error: true, message: `Error parsing spec: ${(error as Error).message}` };
+      return { error: true, message: `Error searching for spec: ${(error as Error).message}` };
+    }
+  }
+
+  // Ensure implementations directory exists
+  if (!fs.existsSync(IMPLEMENTATIONS_DIR)) {
+    fs.mkdirSync(IMPLEMENTATIONS_DIR, { recursive: true });
+  }
+  
+  // Set up the output file paths
+  const specName = specPath ? path.basename(specPath, path.extname(specPath)) : 'implementation';
+  const outlineFilePath = path.join(IMPLEMENTATIONS_DIR, `${specName}.impl.md`);
+  const diffFilePath = path.join(IMPLEMENTATIONS_DIR, `${specName}.diff.md`);
+  
+  // Check if implementation outline already exists
+  let implOutline: { text: string; bullets: string[] } = { text: '', bullets: [] };
+  let shouldGenerateOutline = true;
+  
+  if (fs.existsSync(outlineFilePath) && !options.force) {
+    // Reuse existing outline if it exists and force flag is not set
+    if (!options.quiet) {
+      console.log(chalk.blue(`📄 Using existing implementation outline from ${outlineFilePath}`));
+    }
+    try {
+      const existingOutline = fs.readFileSync(outlineFilePath, 'utf8');
+      
+      // Remove the heading/description if it exists
+      const startIndex = existingOutline.indexOf('1. ');
+      const cleanedOutline = startIndex !== -1 ? existingOutline.substring(startIndex) : existingOutline;
+      
+      // Extract bullet points
+      const bullets = cleanedOutline.split('\n')
+        .filter(line => line.trim().match(/^\d+(\.\d+)*\s+\S/))
+        .map(line => line.trim());
+      
+      implOutline = {
+        text: cleanedOutline,
+        bullets
+      };
+      
+      shouldGenerateOutline = false;
+    } catch (error) {
+      if (!options.quiet) {
+        console.error(chalk.yellow(`⚠️ Error reading existing outline, will regenerate: ${(error as Error).message}`));
+      }
+      shouldGenerateOutline = true;
     }
   }
   
-  // Resolve the files to analyze
+  // Resolve the files to analyze if we need to generate an outline
   let filesToAnalyze: string[] = [];
   
-  if (options.files && options.files.length > 0) {
-    // Use explicitly provided files
-    filesToAnalyze = options.files;
-  } else if (specData.files && specData.files.length > 0) {
-    // Use files from the spec
-    filesToAnalyze = specData.files;
-  } else {
-    // No files specified, use embedding to find relevant files
-    if (!options.quiet) {
-      console.log(chalk.blue('🔍 No files specified, finding relevant files using embeddings...'));
+  if (shouldGenerateOutline) {
+    if (options.files && options.files.length > 0) {
+      // Use explicitly provided files
+      filesToAnalyze = options.files;
+    } else if (specData.files && specData.files.length > 0) {
+      // Use files from the spec
+      filesToAnalyze = specData.files;
+    } else {
+      // No files specified, use embedding to find relevant files
+      if (!options.quiet) {
+        console.log(chalk.blue('🔍 No files specified, finding relevant files using embeddings...'));
+      }
+      
+      try {
+        const specTitle = specData.title || (specPath ? path.basename(specPath, path.extname(specPath)) : 'unknown');
+        const relevantFiles = await getRelevantFiles(specTitle, 10);
+        filesToAnalyze = relevantFiles.map(file => file.path);
+        
+        if (!options.quiet) {
+          console.log(chalk.green(`✅ Found ${filesToAnalyze.length} relevant files.`));
+        }
+      } catch (error) {
+        if (!options.quiet) {
+          console.error(chalk.red(`❌ Error finding relevant files: ${(error as Error).message}`));
+          console.log('Please specify files using --files option.');
+        }
+        return { error: true, message: `Error finding relevant files: ${(error as Error).message}` };
+      }
     }
     
-    try {
-      const specTitle = specData.title || (specPath ? path.basename(specPath, path.extname(specPath)) : 'unknown');
-      const relevantFiles = await getRelevantFiles(specTitle, 10);
-      filesToAnalyze = relevantFiles.map(file => file.path);
-      
+    if (filesToAnalyze.length === 0) {
       if (!options.quiet) {
-        console.log(chalk.green(`✅ Found ${filesToAnalyze.length} relevant files.`));
-      }
-    } catch (error) {
-      if (!options.quiet) {
-        console.error(chalk.red(`❌ Error finding relevant files: ${(error as Error).message}`));
+        console.error(chalk.red('❌ No files to analyze.'));
         console.log('Please specify files using --files option.');
       }
-      return { error: true, message: `Error finding relevant files: ${(error as Error).message}` };
+      return { error: true, message: 'No files to analyze' };
     }
-  }
-  
-  if (filesToAnalyze.length === 0) {
-    if (!options.quiet) {
-      console.error(chalk.red('❌ No files to analyze.'));
-      console.log('Please specify files using --files option.');
-    }
-    return { error: true, message: 'No files to analyze' };
-  }
-  
-  // Read file contents
-  const fileContents: Record<string, string> = {};
-  for (const file of filesToAnalyze) {
-    try {
-      fileContents[file] = await getFileContent(file);
-    } catch (error) {
-      if (!options.quiet) {
-        console.error(chalk.yellow(`⚠️ Could not read file ${file}: ${(error as Error).message}`));
+    
+    // Read file contents
+    const fileContents: Record<string, string> = {};
+    for (const file of filesToAnalyze) {
+      try {
+        fileContents[file] = await getFileContent(file);
+      } catch (error) {
+        if (!options.quiet) {
+          console.error(chalk.yellow(`⚠️ Could not read file ${file}: ${(error as Error).message}`));
+        }
       }
     }
+    
+    // Generate the implementation outline
+    if (!options.quiet) {
+      console.log(chalk.blue('🔄 Generating implementation outline...'));
+    }
+    
+    implOutline = await generateImplementationOutline(fileContents, options.depth || 2);
+    
+    // Save the clean implementation outline (without descriptive text)
+    const titlePrefix = `# ${specData.title || specName} Implementation\n\n`;
+    fs.writeFileSync(outlineFilePath, titlePrefix + implOutline.text, 'utf8');
+    
+    if (!options.quiet) {
+      console.log(chalk.green(`✅ Implementation outline saved to ${outlineFilePath}`));
+    }
   }
-  
-  // Generate the implementation outline
-  if (!options.quiet) {
-    console.log(chalk.blue('🔄 Generating implementation outline...'));
-  }
-  
-  const implOutline = await generateImplementationOutline(fileContents, options.depth || 2);
   
   // Get the spec requirements
   const specRequirements = extractSpecRequirements(specData);
   
-  // Save the implementation outline to a file
-  const outputDir = path.dirname(specPath || '.');
-  const specName = specPath ? path.basename(specPath, path.extname(specPath)) : 'implementation';
-  const outlineFilePath = path.join(outputDir, `${specName}.impl.md`);
+  // Always generate the diff report (enabled by default unless explicitly disabled)
+  const shouldGenerateDiff = options.diff !== false;
   
-  fs.writeFileSync(outlineFilePath, implOutline.text, 'utf8');
-  
-  if (!options.quiet) {
-    console.log(chalk.green(`✅ Implementation outline saved to ${outlineFilePath}`));
-  }
-  
-  // If diff is requested, generate a diff report
-  if (options.diff) {
+  if (shouldGenerateDiff) {
     if (!options.quiet) {
-      console.log(chalk.blue('🔄 Generating diff report...'));
+      console.log(chalk.blue('🔄 Generating comparison report between spec and implementation...'));
     }
     
     const diffReport = await generateDiffReport(specRequirements, implOutline.bullets);
@@ -177,25 +266,31 @@ export async function outlineCommand(options: OutlineCommandOptions = {}): Promi
       outputContent = JSON.stringify(diffReport, null, 2);
     } else {
       // Default to markdown
-      outputContent = formatDiffReportAsMarkdown(diffReport);
+      outputContent = formatDiffReportAsMarkdown(diffReport, specData.title || specName);
     }
     
     // Save the diff report to a file
-    const diffFilePath = path.join(outputDir, `${specName}.diff.md`);
     fs.writeFileSync(diffFilePath, outputContent, 'utf8');
     
     if (!options.quiet) {
-      console.log(chalk.green(`✅ Diff report saved to ${diffFilePath}`));
+      console.log(chalk.green(`✅ Comparison report saved to ${diffFilePath}`));
       
       // Print a summary
       const matchCount = diffReport.filter(item => item.status === 'match').length;
       const gapCount = diffReport.filter(item => item.status === 'gap').length;
       const conflictCount = diffReport.filter(item => item.status === 'conflict').length;
       
-      console.log('\nSummary:');
+      console.log('\n📊 Comparison Summary:');
       console.log(chalk.green(`✅ Matches: ${matchCount}`));
       console.log(chalk.yellow(`⚠️ Potential gaps: ${gapCount}`));
       console.log(chalk.red(`❌ Conflicts/Missing: ${conflictCount}`));
+      
+      // Print the diff report to the console
+      console.log('\n' + chalk.cyan('===== SPEC VS IMPLEMENTATION COMPARISON =====\n'));
+      
+      // Create and display a pretty table for terminal output
+      const prettyTable = createPrettyTable(diffReport);
+      console.log(prettyTable);
       
       // If audit mode is enabled and there are conflicts, fail
       if (options.audit && conflictCount > 0) {
@@ -247,6 +342,8 @@ Example format:
    1.2 fetch user by email
    ...
 
+Return ONLY the bulleted list with no introduction, description, or explanation text.
+
 Files to analyze:
 ${fileText}
 `;
@@ -254,13 +351,19 @@ ${fileText}
   // Call the AI to generate the outline
   const response = await aiSummarize(prompt);
   
-  // Extract the bullet points
-  const bullets = response.split('\n')
+  // Extract the bullet points and remove any descriptive text
+  let cleanText = response;
+  const firstBulletIndex = response.indexOf('1. ');
+  if (firstBulletIndex !== -1) {
+    cleanText = response.substring(firstBulletIndex);
+  }
+  
+  const bullets = cleanText.split('\n')
     .filter(line => line.trim().match(/^\d+(\.\d+)*\s+\S/))
     .map(line => line.trim());
   
   return {
-    text: response,
+    text: cleanText,
     bullets
   };
 }
@@ -323,7 +426,7 @@ async function generateDiffReport(specRequirements: string[], implBullets: strin
       // No spec requirements
       for (const implBullet of implBullets) {
         report.push({
-          specBullet: '― **missing in spec** ―',
+          specBullet: '❓ Not in spec',
           implBullet,
           status,
           similarity: 0
@@ -334,7 +437,7 @@ async function generateDiffReport(specRequirements: string[], implBullets: strin
       for (const specBullet of specRequirements) {
         report.push({
           specBullet,
-          implBullet: '― **missing in implementation** ―',
+          implBullet: '❌ Missing',
           status,
           similarity: 0
         });
@@ -367,7 +470,7 @@ async function generateDiffReport(specRequirements: string[], implBullets: strin
       status = 'gap';
     } else {
       status = 'conflict';
-      bestMatch = '― **missing** ―';
+      bestMatch = '❌ Missing';
     }
     
     report.push({
@@ -379,12 +482,12 @@ async function generateDiffReport(specRequirements: string[], implBullets: strin
   }
   
   // Find implementation bullets not covered by spec
-  const coveredImplBullets = new Set(report.map(item => item.implBullet).filter(bullet => bullet !== '― **missing** ―'));
+  const coveredImplBullets = new Set(report.map(item => item.implBullet).filter(bullet => bullet !== '❌ Missing'));
   
   for (const implBullet of implBullets) {
     if (!coveredImplBullets.has(implBullet)) {
       report.push({
-        specBullet: '― **not covered in spec** ―',
+        specBullet: '❓ Not in spec',
         implBullet,
         status: 'gap',
         similarity: 0
@@ -415,17 +518,17 @@ function calculateSimilarity(a: string, b: string): number {
 }
 
 /**
- * Format diff report as a Markdown table
+ * Format diff report as a Markdown table and terminal output
  */
 function formatDiffReportAsMarkdown(diffReport: Array<{
   specBullet: string;
   implBullet: string;
   status: 'match' | 'gap' | 'conflict';
   similarity: number;
-}>): string {
+}>, title: string): string {
   // Create header row
-  const headerRow = ['#', 'Spec bullet', 'Impl bullet', 'Status'];
-  const alignRow = ['-', '-----------', '-----------', '------'];
+  const headerRow = ['#', 'Spec Requirement', 'Implementation', 'Status'];
+  const alignRow = ['-', '---------------', '--------------', '------'];
   
   // Create data rows
   const dataRows = diffReport.map((item, index) => {
@@ -446,34 +549,103 @@ function formatDiffReportAsMarkdown(diffReport: Array<{
   const markdownTable = createTwoColumnMarkdownTable(tableData);
   
   // Add title and legend
-  return `# Spec vs Implementation Comparison\n\n${markdownTable}\n\nLegend:\n- ✅ Match: High similarity\n- ⚠️ Gap: Potential semantic gap\n- ❌ Conflict: Missing or conflicting implementation`;
+  return `# ${title}: Spec vs Implementation Comparison\n\n${markdownTable}\n\n## Legend\n- ✅ Match: High similarity between spec and implementation\n- ⚠️ Gap: Potential semantic gap, functionality exists but may not fully match\n- ❌ Conflict: Missing or conflicting implementation`;
 }
 
 /**
- * Get emoji for status
+ * Get emoji for status with color support
  */
 function getStatusEmoji(status: 'match' | 'gap' | 'conflict'): string {
   switch (status) {
     case 'match':
-      return '✅';
+      return chalk.green('✅');
     case 'gap':
-      return '⚠️ (not covered)';
+      return chalk.yellow('⚠️');
     case 'conflict':
-      return '❌';
+      return chalk.red('❌');
     default:
       return '';
   }
+}
+
+/**
+ * Create a pretty table for console output
+ */
+function createPrettyTable(diffReport: Array<{
+  specBullet: string;
+  implBullet: string;
+  status: 'match' | 'gap' | 'conflict';
+  similarity: number;
+}>): string {
+  // Get max column widths for formatting
+  const maxNumWidth = Math.max(String(diffReport.length).length, 2);
+  const maxSpecWidth = Math.min(40, Math.max(...diffReport.map(item => item.specBullet.length), 15));
+  const maxImplWidth = Math.min(40, Math.max(...diffReport.map(item => item.implBullet.length), 15));
+  
+  // Box drawing characters
+  const hLine = '─';
+  const vLine = '│';
+  const tl = '┌';
+  const tr = '┐';
+  const bl = '└';
+  const br = '┘';
+  const lJoin = '├';
+  const rJoin = '┤';
+  const tJoin = '┬';
+  const bJoin = '┴';
+  const cross = '┼';
+  
+  // Create header
+  const topBorder = `${tl}${hLine.repeat(maxNumWidth + 2)}${tJoin}${hLine.repeat(maxSpecWidth + 2)}${tJoin}${hLine.repeat(maxImplWidth + 2)}${tJoin}${hLine.repeat(8)}${tr}`;
+  
+  const headerRow = `${vLine} ${'#'.padEnd(maxNumWidth)} ${vLine} ${'Spec Requirement'.padEnd(maxSpecWidth)} ${vLine} ${'Implementation'.padEnd(maxImplWidth)} ${vLine} Status ${vLine}`;
+  
+  const midBorder = `${lJoin}${hLine.repeat(maxNumWidth + 2)}${cross}${hLine.repeat(maxSpecWidth + 2)}${cross}${hLine.repeat(maxImplWidth + 2)}${cross}${hLine.repeat(8)}${rJoin}`;
+  
+  // Create data rows
+  const dataRows = diffReport.map((item, idx) => {
+    const num = (idx + 1).toString().padEnd(maxNumWidth);
+    
+    let spec = item.specBullet;
+    let impl = item.implBullet;
+    
+    // Truncate if too long
+    if (spec.length > maxSpecWidth) {
+      spec = spec.substring(0, maxSpecWidth - 3) + '...';
+    }
+    
+    if (impl.length > maxImplWidth) {
+      impl = impl.substring(0, maxImplWidth - 3) + '...';
+    }
+    
+    const statusEmoji = getStatusEmoji(item.status);
+    const status = statusEmoji.padStart(4).padEnd(6);
+    
+    return `${vLine} ${num} ${vLine} ${spec.padEnd(maxSpecWidth)} ${vLine} ${impl.padEnd(maxImplWidth)} ${vLine} ${status} ${vLine}`;
+  });
+  
+  const bottomBorder = `${bl}${hLine.repeat(maxNumWidth + 2)}${bJoin}${hLine.repeat(maxSpecWidth + 2)}${bJoin}${hLine.repeat(maxImplWidth + 2)}${bJoin}${hLine.repeat(8)}${br}`;
+  
+  // Combine all parts
+  return [
+    topBorder,
+    headerRow,
+    midBorder,
+    ...dataRows,
+    bottomBorder
+  ].join('\n');
 }
 
 // When the module is executed directly, run the outline command
 if (import.meta.url === `file://${process.argv[1]}`) {
   const options: OutlineCommandOptions = {
     spec: process.argv[2],
-    diff: process.argv.includes('--diff'),
+    diff: process.argv.includes('--diff') || true, // Enable diff by default
     depth: process.argv.includes('--depth') ? parseInt(process.argv[process.argv.indexOf('--depth') + 1]) : 2,
     format: process.argv.includes('--format') ? process.argv[process.argv.indexOf('--format') + 1] as 'json' | 'markdown' : 'markdown',
     audit: process.argv.includes('--audit'),
-    auto: process.argv.includes('--auto')
+    auto: process.argv.includes('--auto'),
+    force: process.argv.includes('--force') // Add force flag to regenerate outline
   };
   
   await outlineCommand(options);
