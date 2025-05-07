@@ -42,12 +42,15 @@ export async function autoFilesCommand(options: AutoFilesOptions): Promise<void>
     
     // Process a single spec if specified
     if (options.spec) {
-      const specPath = getSpecByName(options.spec);
+      const specPaths = await getSpecByName(options.spec);
       
-      if (!specPath) {
+      if (!specPaths || specPaths.length === 0) {
         spinner.fail(`Spec not found: ${options.spec}`);
         return;
       }
+      
+      // Use the first matching spec
+      const specPath = specPaths[0];
       
       spinner.text = `Processing spec: ${options.spec}`;
       

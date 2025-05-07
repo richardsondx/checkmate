@@ -162,6 +162,22 @@ checkmate promote --to-agent user-auth
 
 ## Cursor Integration & Prompts
 
+### Hardened Cursor Integration
+
+CheckMate includes a robust enforcement mechanism to ensure specs truly pass before Cursor marks a task as complete:
+
+```yaml
+# Auto-Fix Configuration (in .checkmate file)
+auto_fix:
+  max_attempts: 5  # Maximum automatic fix attempts before human intervention
+```
+
+Features:
+- **Fail-Fast Mode** - Tests stop at first failure for targeted fixes
+- **Automatic Retry** - System tracks fix attempts to prevent infinite loops
+- **Configurable Retry Budget** - Set max attempts in the `.checkmate` file
+- **Human Intervention** - When max attempts are reached, forces human review
+
 ### Setting Up MCP
 
 ```bash

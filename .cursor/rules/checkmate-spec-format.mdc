@@ -1,0 +1,8 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# CheckMate · Spec‑Format Linter
+- On file save in checkmate/specs/, validate format
+  - Execute: node scripts/validate-spec-format.js "$FILEPATH"

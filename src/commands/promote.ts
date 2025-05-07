@@ -25,11 +25,14 @@ function ensureAgentsDir(): void {
  */
 export async function promoteToAgent(specSlug: string, options: { selectedOnly?: boolean } = {}): Promise<string | null> {
   try {
-    const specPath = await getSpecByName(specSlug);
-    if (!specPath) {
+    const specPaths = await getSpecByName(specSlug);
+    if (!specPaths || specPaths.length === 0) {
       console.error(chalk.red(`❌ Error: Spec "${specSlug}" not found`));
       return null;
     }
+    
+    // Use the first matching spec
+    const specPath = specPaths[0];
     
     // Parse the spec
     const spec = parseSpec(specPath);
@@ -45,7 +48,7 @@ export async function promoteToAgent(specSlug: string, options: { selectedOnly?:
     // If selectedOnly is true, only include requirements that are not checked (failing)
     if (options.selectedOnly) {
       // For Markdown files, we check the status by looking for "[x]" vs "[ ]"
-      if (specPath.endsWith('.md')) {
+      if (typeof specPath === 'string' && specPath.endsWith('.md')) {
         const fileContent = fs.readFileSync(specPath, 'utf8');
         requirements = requirements.filter(req => {
           // For each requirement, check if it appears as "- [x]" (checked, passing) in the file

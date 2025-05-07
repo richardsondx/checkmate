@@ -76,6 +76,15 @@ export function init(): void {
     cursorRulesMessage = 'Added Cursor rule files (.mdc) in .cursor/rules/';
   }
   
+  // Run the script to generate additional MDC rules
+  try {
+    console.log('Creating additional Cursor MDC rules...');
+    const { execSync } = require('node:child_process');
+    execSync('node scripts/create-cursor-mdc-rules.js', { stdio: 'inherit' });
+  } catch (error) {
+    console.error('Error creating Cursor MDC rules:', error);
+  }
+  
   // Display confirmation
   printBox(`
 CheckMate initialized! 

@@ -13,26 +13,64 @@ When you initialize CheckMate with `checkmate init`, it automatically creates ru
 These rules execute the following commands:
 
 ```yaml
-pre_task:
-  - name: cm_scope
-    cmd: checkmate affected      # Find specs affected by changes
-    env: {CM_LIST: "$OUTPUT"}    # Store result for later use
+pre-task:
+  # CheckMate – Scope & Reset
+  - Scope analysis:
+    - Execute: checkmate affected --json > .cursor/cm_list.json
+  - Reset automatic‑fix counter:
+    - SetEnv: CM_FIX_COUNT=0
 
-post_task:
-  - name: cm_verify
-    cmd: checkmate run --target "$CM_LIST"  # Verify affected specs
+post-task:
+  # CheckMate – Verify & Auto‑Fix
+  - Execute: node scripts/cm-enforce.js run \
+             --target "$(jq -r '.[]' .cursor/cm_list.json)" \
+             --fail-early
+  - Env:
+      CM_MAX_FIXES: 5
+      CM_FIX_COUNT: $CM_FIX_COUNT
 
-post_push:
-  - name: cm_regress
-    cmd: checkmate run          # Run all specs as regression test
+post-push:
+  # CheckMate – Full Suite on Push
+  - Execute: node scripts/cm-enforce.js run
 ```
 
 This creates an automated workflow:
 * Before a task, CheckMate identifies which specs might be affected
-* After a task, it verifies those specs pass
+* After a task, it verifies those specs pass with retry capability
 * Before pushing code, it ensures all specs pass
 
 You can view and modify these rules in `.cursor/rules/` or in `.cursor/config.yaml` if you prefer YAML format.
+
+## Hardened Enforcement
+
+CheckMate uses a robust enforcement mechanism to ensure specs truly pass before Cursor marks a task as complete:
+
+### Key Features
+
+1. **Bulletproof Exit Codes** - The `cm-enforce.js` script ensures non-zero exit codes for any failures, which forces Cursor to stay in the "fixing" state.
+
+2. **Fail-Early Mode** - The `--fail-early` flag makes tests stop at the first failure, allowing the AI to focus on fixing one issue at a time.
+
+3. **Automatic Fix Attempts** - The system tracks fix attempts with the `CM_FIX_COUNT` environment variable, preventing infinite loops.
+
+4. **Configurable Retry Budget** - You can configure maximum automatic fix attempts in your `.checkmate` file:
+   ```yaml
+   auto_fix:
+     max_attempts: 5  # Default value
+   ```
+
+5. **Machine-Readable Markers** - Special markers like `[CM-PASS]` and `[CM-FAIL]` provide clear signals to Cursor.
+
+### How It Works
+
+1. Before tasks begin, the `pre-task.mdc` rule resets the fix counter to zero.
+2. When running validations, the `cm-enforce.js` script:
+   - Runs CheckMate with your specified options 
+   - On success, resets the fix counter and exits with code 0
+   - On failure, increments the fix counter and exits with code 1
+   - When max attempts are reached, exits with code 2 to indicate human intervention is needed
+
+This system guarantees that Cursor cannot mark a task as "Done" until all specs pass or the system explicitly asks for human help.
 
 ## Visual Task Indicators
 

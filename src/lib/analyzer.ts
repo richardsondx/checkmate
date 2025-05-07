@@ -6,6 +6,12 @@ import { createLanguageModel, LanguageModel } from './modelWrapper.js';
 import { SpecDraft } from '../commands/draft.js';
 import { load as loadConfig } from './config.js';
 import { createSlug } from './specs.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+// Directory where patterns are cached between audit and warmup
+const CACHE_DIR = 'checkmate/cache';
+const WARMUP_PATTERNS_FILE = path.join(CACHE_DIR, 'warmup-patterns.json');
 
 /**
  * Analyze codebase to identify potential features and generate draft specs
@@ -98,6 +104,50 @@ Be precise and thorough in your analysis.
 }
 
 /**
+ * Load cached implementation patterns from audit runs
+ * This helps align warmup-generated specs with what audit expects
+ */
+function loadCachedPatterns(): Record<string, string[]> {
+  if (fs.existsSync(WARMUP_PATTERNS_FILE)) {
+    try {
+      return JSON.parse(fs.readFileSync(WARMUP_PATTERNS_FILE, 'utf8'));
+    } catch (error) {
+      console.warn(`Warning: Could not read warmup patterns cache: ${error}`);
+    }
+  }
+  return {};
+}
+
+/**
+ * Save implementation patterns to cache for use in future warmup runs
+ * @param slug - The slug/identifier for the spec
+ * @param patterns - Array of action bullet patterns found in implementation
+ */
+export function saveWarmupPatterns(slug: string, patterns: string[]): void {
+  // Ensure the cache directory exists
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+  
+  // Load existing patterns
+  const existingPatterns = loadCachedPatterns();
+  
+  // Add or update the patterns for this slug
+  existingPatterns[slug] = patterns;
+  
+  // Write back to cache file
+  try {
+    fs.writeFileSync(
+      WARMUP_PATTERNS_FILE, 
+      JSON.stringify(existingPatterns, null, 2), 
+      'utf8'
+    );
+  } catch (error) {
+    console.warn(`Warning: Could not save warmup patterns cache: ${error}`);
+  }
+}
+
+/**
  * Generate a draft spec from a file group
  * @param group - The file group to generate a draft for
  * @param context - The repository context
@@ -126,32 +176,83 @@ async function generateDraftFromGroup(
   if (fileContents.length === 0) {
     return null;
   }
+
+  // Generate a slug for this domain to check against cached patterns
+  const slug = createSlug(group.domain);
   
-  // Prepare prompt for the model
+  // Load cached implementation patterns from audit runs
+  const cachedPatterns = loadCachedPatterns();
+  
+  // Check if we have cached patterns for this domain or similar domains
+  let knownPatterns: string[] = [];
+  
+  // Try to find exact match first
+  if (cachedPatterns[slug]) {
+    knownPatterns = cachedPatterns[slug];
+  } else {
+    // Look for similar domains
+    for (const cachedDomain in cachedPatterns) {
+      if (
+        cachedDomain.includes(slug) || 
+        slug.includes(cachedDomain) ||
+        (group.domain.toLowerCase().includes('mcp') && cachedDomain.includes('mcp')) ||
+        (group.domain.toLowerCase().includes('server') && cachedDomain.includes('server'))
+      ) {
+        knownPatterns = cachedPatterns[cachedDomain];
+        break;
+      }
+    }
+  }
+  
+  // Add hints about known patterns to the prompt if we have them
+  const knownPatternsHint = knownPatterns.length > 0 
+    ? `\nImportantly, analysis of this codebase has identified these specific implementations that should be included in your checks:
+${knownPatterns.map(pattern => `- ${pattern}`).join('\n')}`
+    : '';
+  
+  // Define stoplist for common verbs to filter out (same as in audit)
+  const stopVerbs = ['return', 'print', 'log', 'console'];
+  
+  // Prepare prompt using the same format as in audit
   const prompt = `
-You are analyzing a group of related files to identify a feature for testing.
+Extract the key actions performed by this code as a list of imperative action bullets.
+Each bullet must follow the format: "verb + object" (e.g., "validate credentials", "hash password").
+
+Guidelines:
+- Use simple present tense imperative verbs (e.g., "create", "fetch", "validate")
+- Each bullet must be a single action (do not combine multiple actions)
+- Focus on functional behavior, not implementation details
+- Filter out trivial actions like ${stopVerbs.join(', ')} unless they're primary functionality
+- Be specific about what the code actually does
+
 The domain for these files is: "${group.domain}"
 
 Here are the file contents:
 
 ${fileContents.join('\n\n')}
+${knownPatternsHint}
 
-Based on these files, create a feature spec by:
-1. Providing a descriptive title for the feature
-2. Creating a list of specific requirements/checks for this feature
-3. Include only the most important checks (3-5 items)
+Based on these files:
+1. Provide a descriptive title for the feature
+2. Extract 4-7 SPECIFIC action bullets that accurately describe what the code ACTUALLY implements
+3. Each bullet must reference actual code functionality in verb+object format
+
+For example:
+- "validate user credentials"
+- "generate authentication token"
+- "store user data in database"
 
 Return your answer as a JSON object with this structure:
 {
   "title": "Feature Title",
   "checks": [
-    "First requirement",
-    "Second requirement",
-    "Third requirement"
+    "First specific action bullet",
+    "Second specific action bullet",
+    "Third specific action bullet"
   ]
 }
 
-Ensure each check is specific, testable, and focuses on user-facing functionality.
+IMPORTANT: Every check MUST use the verb+object format and refer to specific functionality in the code.
 `;
 
   // Call the model to get the feature spec

@@ -91,6 +91,7 @@ IMPORTANT: The ONLY allowed format is:
 DO NOT include any other sections, headings, or notes.
 DO NOT include a "## Files" or "## Relevant Files" section as we will add this metadata separately.
 
+Make each check specific to actual code functionality, referencing functions, methods or components that exist in the code.
 Return ONLY the markdown content, no explanations or additional text.`;
 
   // Define the system prompt for the model

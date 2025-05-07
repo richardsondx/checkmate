@@ -8,7 +8,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -26,13 +26,75 @@ const args = process.argv.slice(2);
 const quietMode = args.includes('--quiet');
 const jsonOutput = args.includes('--json');
 const strictModeEnabled = args.includes('--strict-specs');
+const failEarly = args.includes('--fail-early');
 
 // Clean up the args we handle
 const checkMateArgs = args.filter(arg => 
   arg !== '--strict-specs' && 
   arg !== '--quiet' && 
-  arg !== '--json'
+  arg !== '--json' &&
+  arg !== '--fail-early'
 );
+
+// Max fix attempts - from env or config
+function getMaxFixAttempts() {
+  // Check environment variable first
+  if (process.env.CM_MAX_FIXES) {
+    return Number(process.env.CM_MAX_FIXES);
+  }
+  
+  // Check .checkmate config file
+  try {
+    if (existsSync('.checkmate')) {
+      const config = readFileSync('.checkmate', 'utf8');
+      const autoFixMatch = config.match(/auto_fix:\s*\n\s*max_attempts:\s*(\d+)/);
+      if (autoFixMatch && autoFixMatch[1]) {
+        return Number(autoFixMatch[1]);
+      }
+    }
+  } catch (e) {
+    // Silently continue if config read fails
+  }
+  
+  // Default value
+  return 5;
+}
+
+// Get current fix count
+function getFixCount() {
+  try {
+    if (existsSync('.cursor/cm_fix_count')) {
+      return Number(readFileSync('.cursor/cm_fix_count', 'utf8'));
+    }
+  } catch (e) {
+    // Silently continue if read fails
+  }
+  
+  return 0;
+}
+
+// Update fix count
+function updateFixCount(count) {
+  try {
+    writeFileSync('.cursor/cm_fix_count', String(count));
+  } catch (e) {
+    // Silently continue if write fails
+    if (!quietMode) {
+      console.error("Failed to update fix count:", e);
+    }
+  }
+}
+
+// Reset fix count
+function resetFixCount() {
+  try {
+    if (existsSync('.cursor/cm_fix_count')) {
+      unlinkSync('.cursor/cm_fix_count');
+    }
+  } catch (e) {
+    // Silently continue if delete fails
+  }
+}
 
 // Check for spec modifications if verification script exists
 function checkSpecs() {
@@ -128,8 +190,16 @@ if (quietMode && !checkMateArgs.includes('--quiet')) {
   finalArgs.push('--quiet');
 }
 
+// Add --fail-early if requested
+if (failEarly && !checkMateArgs.includes('--fail-early')) {
+  finalArgs.push('--fail-early');
+}
+
+// Ensure we capture stdout if we need to parse it for emoji summary
+const stdioOptions = jsonOutput ? 'pipe' : 'inherit';
 const result = spawnSync('npx', ['checkmate', ...finalArgs], {
-  stdio: 'inherit'
+  stdio: stdioOptions,
+  encoding: 'utf8'
 });
 
 // Display footer unless quiet mode or JSON output
@@ -151,15 +221,64 @@ if (result.status === 0) {
   } else if (!quietMode) {
     console.log(`${CM_PASS} CheckMate requirements passed`);
   }
+  
+  // Add emoji summary for passing specs
+  try {
+    if (result.stdout) {
+      const r = JSON.parse(result.stdout);
+      if (r.specs) {
+        const rows = r.specs.map(s => `✅ ${s.slug}`).join("\n");
+        console.log("\n" + rows);
+        console.log(`\nSummary: ${r.total}/${r.total} pass`);
+      }
+    }
+  } catch (e) {
+    // Silently continue if parsing fails
+  }
+  
+  // Reset fix count on success
+  resetFixCount();
   process.exit(0);
 } else {
+  // Handle fix attempts counting
+  const maxAttempts = getMaxFixAttempts();
+  const currentCount = getFixCount();
+  
+  if (currentCount + 1 >= maxAttempts) {
+    if (!quietMode) {
+      console.error(`${CM_FAIL} Max automatic fix attempts (${maxAttempts}) reached`);
+    }
+    process.exit(2); // Special exit code for max attempts
+  }
+  
+  // Increment the fix counter
+  updateFixCount(currentCount + 1);
+  
   if (jsonOutput) {
     console.log(JSON.stringify({
       status: 'FAIL',
+      fixAttempt: currentCount + 1,
+      maxAttempts: maxAttempts,
       exitCode: 1
     }));
   } else if (!quietMode) {
-    console.error(`${CM_FAIL} CheckMate requirements failed`);
+    console.error(`${CM_FAIL} CheckMate requirements failed (fix attempt ${currentCount + 1}/${maxAttempts})`);
   }
+  
+  // Add emoji summary for failing specs
+  try {
+    if (result.stdout) {
+      const r = JSON.parse(result.stdout);
+      if (r.specs) {
+        const rows = r.specs.map(s =>
+          `${s.pass ? "✅" : "❌"} ${s.slug}`).join("\n");
+        console.log("\n" + rows);
+        console.log(`\nSummary: ${r.totalPass}/${r.total} pass`);
+      }
+    }
+  } catch (e) {
+    // Silently continue if parsing fails
+  }
+  
   process.exit(1);
 } 

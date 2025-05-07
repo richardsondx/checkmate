@@ -16,3 +16,7 @@ spec_snapshot_path: .checkmate/spec-snapshot.json
 lint:
   empty_checks: error  # Fail when a spec has no meaningful requirements
   trivial_assert: error  # Fail when test block contains only literals like 'return true'
+
+# Auto-fix Configuration
+auto_fix:
+  max_attempts: 5  # Maximum number of automatic fix attempts before requiring human intervention

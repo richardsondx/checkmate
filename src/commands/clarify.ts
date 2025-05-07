@@ -35,11 +35,14 @@ export async function clarifyCommand(options: ClarifyOptions): Promise<ClarifyRe
   
   try {
     // Get the spec content
-    const specPath = getSpecByName(options.slug);
-    if (!specPath) {
+    const specPaths = await getSpecByName(options.slug);
+    if (!specPaths || specPaths.length === 0) {
       spinner.fail(`Spec "${options.slug}" not found`);
       throw new Error(`Spec "${options.slug}" not found`);
     }
+    
+    // Use the first matching spec
+    const specPath = specPaths[0];
     
     // Read file content directly
     const content = fs.readFileSync(specPath, 'utf8');

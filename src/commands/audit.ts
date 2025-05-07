@@ -14,6 +14,7 @@ import * as fs from 'node:fs';
 import { getSpecByName, parseSpec } from '../lib/specs.js';
 import { getFileContent, getRelevantFiles } from '../lib/files.js';
 import { aiSummarize } from '../lib/ai-client.js';
+import { saveWarmupPatterns } from '../lib/analyzer.js';
 import { testCommand } from './test.js';
 import { statusCommand } from './status.js';
 import * as readline from 'node:readline/promises';
@@ -118,6 +119,7 @@ export async function auditCommand(options: AuditCommandOptions = {}): Promise<a
   
   // Set up the cache file path
   const specName = specPath ? path.basename(specPath, path.extname(specPath)) : 'unknown';
+  const slug = specName.replace(/\s+/g, '-').toLowerCase();
   const cacheFilePath = path.join(CACHE_DIR, `${specName}.bullets.json`);
   
   // First run tests on the spec
@@ -234,6 +236,9 @@ export async function auditCommand(options: AuditCommandOptions = {}): Promise<a
       timestamp: new Date().toISOString(),
       bullets: implBullets
     }, null, 2), 'utf8');
+    
+    // Update the warmup patterns cache with implementation bullets
+    saveWarmupPatterns(slug, implBullets);
     
     if (!options.quiet) {
       console.log(chalk.green(`✅ Implementation bullets cached to ${cacheFilePath}`));

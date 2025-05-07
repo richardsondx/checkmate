@@ -118,8 +118,22 @@ async function saveMarkdownSpec(draft: SpecDraft): Promise<string> {
     const checksSection = content.match(/(?:##|###) (?:Checks|Requirements)\s+([\s\S]*?)(?=##|$)/);
     if (checksSection) {
       const newChecks = draft.checks.map(check => `- [ ] ${check}`).join('\n');
-      content = content.replace(checksSection[0], `## Requirements\n${newChecks}\n\n`);
+      content = content.replace(checksSection[0], `## Checks\n${newChecks}\n\n`);
     }
+  }
+  
+  // Ensure meta section is properly included
+  const metaJson = JSON.stringify({
+    files_auto: true,
+    file_hashes: draft.files.reduce((acc: Record<string, string>, file: string) => {
+      acc[file] = draft.meta?.file_hashes?.[file] || 'auto-generated';
+      return acc;
+    }, {} as Record<string, string>)
+  }, null, 2);
+  
+  // Check if content already has a meta section
+  if (!content.includes('<!-- meta:')) {
+    content += `\n\n<!-- meta:\n${metaJson}\n-->\n`;
   }
   
   // Add footer to indicate it was generated via interactive mode
@@ -144,31 +158,28 @@ async function saveYamlSpec(draft: SpecDraft): Promise<string> {
   
   // Create a custom YAML structure
   const yamlSpec = {
-    type: 'B',
-    name: draft.title,
-    description: draft.description || '',
+    title: draft.title,
     files: draft.files,
-    // Add checks in the format TypeB spec expects
-    checks: draft.checks.map((check, index) => ({
+    // Convert 'checks' to 'requirements' format for YAML specs
+    requirements: draft.checks.map((check, index) => ({
       id: `req-${index + 1}`,
-      description: check,
-      criteria: ['Manual verification']
+      require: check,
+      test: `file ${draft.files[0] || 'src/index.ts'} => EXISTS`,
+      status: false
     })),
-    validationRules: [
-      {
-        type: 'code',
-        rule: 'Files must exist'
-      }
-    ],
-    metadata: {
-      generatedVia: 'checkmate interactive v0.4',
-      timestamp: new Date().toISOString()
+    meta: {
+      files_auto: true,
+      file_hashes: draft.files.reduce((acc: Record<string, string>, file: string) => {
+        acc[file] = draft.meta?.file_hashes?.[file] || 'auto-generated';
+        return acc;
+      }, {} as Record<string, string>)
     }
   };
   
-  // Convert to JSON and save
-  const specJson = JSON.stringify(yamlSpec, null, 2);
-  fs.writeFileSync(specPath, specJson, 'utf8');
+  // Convert to YAML and save
+  const yaml = require('yaml');
+  const yamlContent = yaml.stringify(yamlSpec);
+  fs.writeFileSync(specPath, yamlContent, 'utf8');
   
   return specPath;
 }

@@ -100,6 +100,21 @@ protect_specs: true
 spec_snapshot_path: .checkmate/spec-snapshot.json
 ```
 
+### Auto-Fix Configuration
+
+| Option | Description |
+|--------|-------------|
+| `auto_fix.max_attempts` | Maximum number of automatic fix attempts before requiring human intervention (default: 5) |
+
+Example:
+
+```yaml
+auto_fix:
+  max_attempts: 5  # Maximum number of automatic fix attempts
+```
+
+This setting is used by the `cm-enforce.js` script when running in Cursor to prevent infinite loops of failed verification attempts. When the maximum number of attempts is reached, the script will exit with a special code that forces Cursor to request human intervention.
+
 ### Lint Configuration
 
 | Option | Description |
@@ -140,6 +155,10 @@ show_thinking: true
 # Spec Protection
 protect_specs: true
 spec_snapshot_path: .checkmate/spec-snapshot.json
+
+# Auto-Fix Configuration
+auto_fix:
+  max_attempts: 5
 
 # Lint Configuration
 lint:

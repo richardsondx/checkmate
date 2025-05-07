@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
+import { spawnSync } from 'node:child_process';
 
 // Constants
 const CURSOR_RULES_DIR = '.cursor/rules';
@@ -19,22 +20,22 @@ alwaysApply: false
 
 // Rule templates
 const RULE_TEMPLATES = {
-  'pre-task': `${RULE_FRONTMATTER}# CheckMate – Pre‑Task Rules
-- Run **scope analysis** before coding.
-- Execute: \`checkmate affected\`
-- Store output as \`$CM_LIST\` for later steps.
-- If the command errors, surface the message and halt.`,
+  'pre-task': `${RULE_FRONTMATTER}# CheckMate – Scope & Reset
+- Scope analysis:
+  - Execute: checkmate affected --json > .cursor/cm_list.json
+- Reset automatic‑fix counter:
+  - SetEnv: CM_FIX_COUNT=0`,
 
-  'post-task': `${RULE_FRONTMATTER}# CheckMate – Post‑Task Verification
-- After coding, verify all affected specs.
-- Execute: \`checkmate run --target "$CM_LIST"\`
-- If any bullet fails, continue fixing until all pass.
-- When all pass, reset boxes (CheckMate handles this internally).`,
+  'post-task': `${RULE_FRONTMATTER}# CheckMate – Verify & Auto‑Fix
+- Execute: node scripts/cm-enforce.js run \\
+           --target "$(jq -r '.[]' .cursor/cm_list.json)" \\
+           --fail-early
+- Env:
+    CM_MAX_FIXES: 5
+    CM_FIX_COUNT: $CM_FIX_COUNT`,
 
   'post-push': `${RULE_FRONTMATTER}# CheckMate – Full Suite on Push
-- On pushes or merges to main, run the entire test suite.
-- Execute: \`checkmate run\`
-- Fail the CI step if any spec fails.`
+- Execute: node scripts/cm-enforce.js run`
 };
 
 /**
@@ -77,4 +78,40 @@ export function generateAllRules(force = false): void {
   Object.entries(RULE_TEMPLATES).forEach(([name, content]) => {
     writeRule(name, content, force);
   });
+  
+  // Create/update additional .mdc validation rules using our dedicated script
+  createMdcRules(force);
+}
+
+/**
+ * Set up the JSON rule files for spec validation
+ * @deprecated Use createMdcRules instead
+ */
+export function setupJsonRules(force = false): void {
+  console.log(chalk.yellow("Warning: setupJsonRules is deprecated. Using createMdcRules instead."));
+  createMdcRules(force);
+}
+
+/**
+ * Set up all the .mdc rule files for CheckMate validation
+ */
+export function createMdcRules(force = false): void {
+  console.log(chalk.blue("Setting up CheckMate validation rules in .mdc format..."));
+  
+  try {
+    // Run the create-cursor-mdc-rules script
+    const result = spawnSync('node', ['scripts/create-cursor-mdc-rules.js'], {
+      stdio: 'inherit'
+    });
+    
+    if (result.error) {
+      console.error(chalk.red("Error setting up CheckMate .mdc rules:"), result.error);
+    } else if (result.status !== 0) {
+      console.error(chalk.red(`MDC setup script exited with code ${result.status}`));
+    } else {
+      console.log(chalk.green("Successfully set up CheckMate .mdc validation rules"));
+    }
+  } catch (error) {
+    console.error(chalk.red("Failed to run MDC setup script:"), error);
+  }
 } 
