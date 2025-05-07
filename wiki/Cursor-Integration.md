@@ -6,11 +6,20 @@ CheckMate integrates seamlessly with Cursor to provide automated validation duri
 
 When you initialize CheckMate with `checkmate init`, it automatically creates rule files in the `.cursor/rules/` directory that automate validation during your development workflow:
 
+### Task Lifecycle Rules
+
 * `pre-task.mdc` - Runs before coding to identify affected specs
 * `post-task.mdc` - Verifies specs after coding is complete
 * `post-push.mdc` - Runs regression tests before pushing to main
 
-These rules execute the following commands:
+### Validation and Format Rules
+
+* `checkmate-spec-drift.mdc` - Audits changed specs after commits
+* `checkmate-spec-drift-on-save.mdc` - Checks for drift when saving code files
+* `checkmate-spec-format.mdc` - Validates spec format on save
+* `checkmate-non-interactive.mdc` - Ensures headless operation of commands
+
+The main task lifecycle rules execute the following commands:
 
 ```yaml
 pre-task:
@@ -38,8 +47,9 @@ This creates an automated workflow:
 * Before a task, CheckMate identifies which specs might be affected
 * After a task, it verifies those specs pass with retry capability
 * Before pushing code, it ensures all specs pass
+* During development, it validates specs and checks for drift to keep everything in sync
 
-You can view and modify these rules in `.cursor/rules/` or in `.cursor/config.yaml` if you prefer YAML format.
+You can view and modify these rules in `.cursor/rules/` directory.
 
 ## Hardened Enforcement
 
