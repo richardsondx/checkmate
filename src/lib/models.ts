@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { load as loadConfig } from './config.js';
 import * as fs from 'node:fs';
 import * as dotenv from 'node:process';
+import * as telemetry from './telemetry.js';
 
 /**
  * Initialize OpenAI client with configuration
@@ -88,12 +89,33 @@ export async function callModel(
     // - 'quick' uses lower temperature for consistent evaluations
     const temperature = slot === 'quick' ? 0 : 0.2;
     
+    // Record start time for telemetry
+    const startTime = Date.now();
+    let result: string;
+    let usage: { prompt: number; completion: number; estimated: boolean };
+    
     // Use the appropriate API based on the model
     if (isAnthropicModel(modelName)) {
-      return callAnthropicModel(modelName, systemPrompt, userPrompt, temperature);
+      const response = await callAnthropicModel(modelName, systemPrompt, userPrompt, temperature);
+      result = response.text;
+      usage = telemetry.pickUsage(response.raw);
     } else {
-      return callOpenAIModel(modelName, systemPrompt, userPrompt, temperature);
+      const response = await callOpenAIModel(modelName, systemPrompt, userPrompt, temperature);
+      result = response.text;
+      usage = telemetry.pickUsage(response.raw);
     }
+    
+    // Record telemetry
+    telemetry.record({
+      provider: isAnthropicModel(modelName) ? 'anthropic' : 'openai',
+      model: modelName,
+      tokensIn: usage.prompt,
+      tokensOut: usage.completion,
+      ms: Date.now() - startTime,
+      estimated: usage.estimated
+    });
+    
+    return result;
   } catch (error) {
     console.error(`Error calling ${slot} model:`, error);
     throw error;
@@ -126,7 +148,7 @@ async function callOpenAIModel(
   systemPrompt: string,
   userPrompt: string,
   temperature: number
-): Promise<string> {
+): Promise<{ text: string; raw: any }> {
   const client = getOpenAIClient();
   
   // For newer models like gpt-4o, use max_completion_tokens instead of max_tokens
@@ -149,8 +171,10 @@ async function callOpenAIModel(
   
   const response = await client.chat.completions.create(params);
   
-  // Extract and return the response text
-  return response.choices[0].message.content?.trim() || '';
+  // Extract the response text
+  const text = response.choices[0].message.content?.trim() || '';
+  
+  return { text, raw: response };
 }
 
 /**
@@ -161,7 +185,7 @@ async function callAnthropicModel(
   systemPrompt: string,
   userPrompt: string,
   temperature: number
-): Promise<string> {
+): Promise<{ text: string; raw: any }> {
   const client = getAnthropicClient();
   
   const response = await client.messages.create({
@@ -174,12 +198,12 @@ async function callAnthropicModel(
     ]
   });
   
-  // Extract and return the response text
+  // Extract the response text
   // Check the content type before accessing the text property
   if (response.content && response.content.length > 0) {
     const contentBlock = response.content[0];
     if (contentBlock.type === 'text') {
-      return contentBlock.text.trim();
+      return { text: contentBlock.text.trim(), raw: response };
     }
   }
   

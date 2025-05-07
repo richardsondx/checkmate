@@ -20,3 +20,11 @@ lint:
 # Auto-fix Configuration
 auto_fix:
   max_attempts: 5  # Maximum number of automatic fix attempts before requiring human intervention
+
+# Token Pricing ($ per 1K tokens)
+pricing:
+  openai/gpt-4o: 0.01
+  openai/gpt-4o-mini: 0.005
+  anthropic/claude-3-opus: 0.015
+  anthropic/claude-3-sonnet: 0.008
+  anthropic/claude-3-haiku: 0.00025

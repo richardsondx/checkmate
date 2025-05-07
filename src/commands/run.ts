@@ -15,6 +15,7 @@ import { printBanner, printBox } from '../ui/banner.js';
 import ora from 'ora';
 import { execSync } from 'child_process';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import * as telemetry from '../lib/telemetry.js';
 
 /**
  * Run the command to execute tests against spec
@@ -28,6 +29,9 @@ export async function runCommand(options: {
   failEarly?: boolean;
   cursor?: boolean;
 }): Promise<void> {
+  // Start telemetry session
+  telemetry.startSession('run');
+  
   // Print welcome banner
   printBanner();
   
@@ -114,6 +118,16 @@ ${totalPassed} passed, ${totalFailed} failed
 
 ${totalFailed > 0 ? '⚠️ Some requirements need attention' : '✅ All requirements passed!'}`
     );
+    
+    // Show telemetry summary
+    try {
+      const t = telemetry.summary();
+      if (t.tokens > 0) {
+        console.log(`\n💡 Tokens: ${t.tokens.toLocaleString()}  Est. Cost: $${t.cost.toFixed(4)}\n`);
+      }
+    } catch (e) {
+      // Silently continue if telemetry fails
+    }
     
     // Set exit code based on success/failure
     const success = totalFailed === 0;

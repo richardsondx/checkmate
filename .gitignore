@@ -8,6 +8,7 @@ dist/
 checkmate/
 .checkmate
 .cursor/config.json
+.checkmate-telemetry/
 
 # Logs
 *.log

@@ -636,6 +636,36 @@ yargsInstance
       });
     })
   
+  // USER COMMANDS - Usage Statistics
+  .command('stats', 'Show token usage and cost statistics', 
+    (yargs: Argv) => {
+      return yargs
+        .option('since', {
+          describe: 'Show stats since timeframe (e.g., 24h, 7d)',
+          type: 'string',
+          alias: 's'
+        })
+        .option('session', {
+          describe: 'Show stats for specific session ID',
+          type: 'string',
+          alias: 'id'
+        })
+        .option('all', {
+          describe: 'Show stats for all sessions',
+          type: 'boolean',
+          alias: 'a'
+        })
+        .option('json', {
+          describe: 'Output in JSON format',
+          type: 'boolean',
+          default: false
+        });
+    }, 
+    async () => {
+      // Import dynamically to avoid circular dependencies
+      await import('./commands/stats.js');
+    })
+  
   // SYSTEM COMMANDS - Testing
   .command('test', 'Test the AI model integration', 
     (yargs: Argv) => {

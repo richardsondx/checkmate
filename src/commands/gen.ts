@@ -13,6 +13,7 @@ import { load as loadConfig } from '../lib/config.js';
 import { generateTypeASpec, generateTypeBSpec, saveSpecification } from '../lib/specAuthor.js';
 import { splitFeature, FeatureStub } from '../lib/splitter.js';
 import { buildContext } from '../lib/context.js';
+import * as telemetry from '../lib/telemetry.js';
 
 const SPECS_DIR = 'checkmate/specs';
 const AGENT_SPECS_DIR = path.join(SPECS_DIR, 'agents');
@@ -29,6 +30,9 @@ interface GenOptions {
 }
 
 export async function genCommand(options?: GenOptions): Promise<{ path: string, content: string } | { paths: string[], contents: string[] }> {
+  // Start telemetry session
+  telemetry.startSession('gen');
+  
   // Print welcome banner
   printBanner();
   
@@ -61,7 +65,19 @@ export async function genCommand(options?: GenOptions): Promise<{ path: string, 
   
   // Use interactive mode if specified
   if (options?.interactive) {
-    return handleInteractiveMode(name, description, options);
+    const result = await handleInteractiveMode(name, description, options);
+    
+    // Show telemetry summary after interactive generation
+    try {
+      const t = telemetry.summary();
+      if (t.tokens > 0) {
+        console.log(`\n💡 Tokens: ${t.tokens.toLocaleString()}  Est. Cost: $${t.cost.toFixed(4)}\n`);
+      }
+    } catch (e) {
+      // Silently continue if telemetry fails
+    }
+    
+    return result;
   }
   
   // Get specification type if not provided
@@ -71,15 +87,31 @@ export async function genCommand(options?: GenOptions): Promise<{ path: string, 
   
   try {
     // Generate based on specification type
+    let result;
     switch (type) {
       case 'A':
-        return await generateTypeASpecification(name, description, options?.output);
+        result = await generateTypeASpecification(name, description, options?.output);
+        break;
       case 'B':
       case 'agent':
-        return await generateTypeBSpecification(name, description, options?.output);
+        result = await generateTypeBSpecification(name, description, options?.output);
+        break;
       default:
-        return await generateRegularSpecification(name, description, options?.files);
+        result = await generateRegularSpecification(name, description, options?.files);
+        break;
     }
+    
+    // Show telemetry summary
+    try {
+      const t = telemetry.summary();
+      if (t.tokens > 0) {
+        console.log(`\n💡 Tokens: ${t.tokens.toLocaleString()}  Est. Cost: $${t.cost.toFixed(4)}\n`);
+      }
+    } catch (e) {
+      // Silently continue if telemetry fails
+    }
+    
+    return result;
   } catch (error) {
     console.error(chalk.red('\n❌ Error generating specification:'), error);
     throw error;

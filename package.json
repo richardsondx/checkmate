@@ -16,6 +16,7 @@
     "dev": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/index.ts",
     "checkmate": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/index.ts",
     "status": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/commands/status.ts",
+    "stats": "node dist/commands/stats.js",
     "mcp": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/mcp/index.ts",
     "setup-mcp": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/commands/setup-mcp.ts",
     "prepare": "npm run build",

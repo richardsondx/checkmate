@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import chalk from 'chalk';
 import chokidar from 'chokidar';
+import * as telemetry from '../lib/telemetry.js';
 
 // Directory for logs
 const LOGS_DIR = 'checkmate/logs';
@@ -207,6 +208,9 @@ export async function watch(options: WatchOptions = {}): Promise<void> {
     untilPass: options.untilPass || false
   };
 
+  // Start telemetry session
+  telemetry.startSession('watch');
+
   // Check if watching a specific spec until it passes
   const watchUntilPass = watchOptions.spec && watchOptions.untilPass;
 
@@ -310,6 +314,17 @@ export async function watch(options: WatchOptions = {}): Promise<void> {
     
     // Print a footer
     console.log(renderSeparator());
+    
+    // Get telemetry summary for this session
+    try {
+      const t = telemetry.summary();
+      if (t.tokens > 0) {
+        console.log(chalk.blue(`\n  Tokens: ${t.tokens.toLocaleString()} / Est. Cost: $${t.cost.toFixed(4)} this session`));
+      }
+    } catch (e) {
+      // Silently continue if telemetry fails
+    }
+    
     console.log(chalk.cyan(`\n  Watching for changes to ${RUN_LOG_FILE}`));
     console.log(chalk.cyan('  Press Ctrl+C to exit\n'));
   }

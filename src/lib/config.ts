@@ -19,6 +19,10 @@ export interface CheckMateConfig {
   context_top_n: number;
   show_thinking: boolean;
   use_embeddings: boolean;
+  pricing?: Record<string, number>;
+  auto_fix?: {
+    max_attempts: number;
+  };
 }
 
 // Default configuration
@@ -34,6 +38,16 @@ const DEFAULT_CONFIG: CheckMateConfig = {
   context_top_n: 40,
   show_thinking: true,
   use_embeddings: true,
+  pricing: {
+    'openai/gpt-4o': 0.01,
+    'openai/gpt-4o-mini': 0.005,
+    'anthropic/claude-3-opus': 0.015,
+    'anthropic/claude-3-sonnet': 0.008,
+    'anthropic/claude-3-haiku': 0.00025,
+  },
+  auto_fix: {
+    max_attempts: 5
+  }
 };
 
 // Path to config file

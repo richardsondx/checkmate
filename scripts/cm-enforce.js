@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import * as telemetry from '../dist/lib/telemetry.js';
 
 // Define visual markers for machine-readable output
 const CM_PASS = '[CM-PASS]';
@@ -152,133 +153,161 @@ function checkSpecs() {
   return true;
 }
 
-// Display header unless quiet mode or JSON output
-if (!quietMode && !jsonOutput) {
-  console.log("");
-  console.log("╔═════════════════════════════════════════╗");
-  console.log("║            CHECKMATE ENFORCER           ║");
-  console.log("╚═════════════════════════════════════════╝");
-  console.log("");
-}
+// Main execution
+(async () => {
+  // Initialize telemetry
+  const command = args[0] || 'run';
+  telemetry.startSession(`cm-enforce:${command}`);
 
-// Check for spec modifications if enabled in .checkmate
-const specCheckPassed = checkSpecs();
+  // Display header unless quiet mode or JSON output
+  if (!quietMode && !jsonOutput) {
+    console.log("");
+    console.log("╔═════════════════════════════════════════╗");
+    console.log("║            CHECKMATE ENFORCER           ║");
+    console.log("╚═════════════════════════════════════════╝");
+    console.log("");
+  }
 
-// In strict mode, fail if spec check failed
-if (!specCheckPassed && strictModeEnabled) {
-  if (jsonOutput) {
-    console.log(JSON.stringify({
-      status: 'FAIL',
-      reason: 'Spec files were modified',
-      exitCode: 1
-    }));
+  // Check for spec modifications if enabled in .checkmate
+  const specCheckPassed = checkSpecs();
+
+  // In strict mode, fail if spec check failed
+  if (!specCheckPassed && strictModeEnabled) {
+    if (jsonOutput) {
+      console.log(JSON.stringify({
+        status: 'FAIL',
+        reason: 'Spec files were modified',
+        exitCode: 1
+      }));
+    } else {
+      console.error(`${CM_FAIL} CheckMate requirements failed - Spec files were modified`);
+    }
+    process.exit(1);
+  }
+
+  // Forward the command to checkmate
+  // Add --json flag if jsonOutput is true and it wasn't already in the args
+  const finalArgs = [...checkMateArgs];
+  if (jsonOutput && !checkMateArgs.includes('--json')) {
+    finalArgs.push('--json');
+  }
+
+  // Add --quiet flag if quietMode is true and it wasn't already in the args
+  if (quietMode && !checkMateArgs.includes('--quiet')) {
+    finalArgs.push('--quiet');
+  }
+
+  // Add --fail-early if requested
+  if (failEarly && !checkMateArgs.includes('--fail-early')) {
+    finalArgs.push('--fail-early');
+  }
+
+  // Ensure we capture stdout if we need to parse it for emoji summary
+  const stdioOptions = jsonOutput ? 'pipe' : 'inherit';
+  const result = spawnSync('npx', ['checkmate', ...finalArgs], {
+    stdio: stdioOptions,
+    encoding: 'utf8'
+  });
+
+  // Display footer unless quiet mode or JSON output
+  if (!quietMode && !jsonOutput) {
+    console.log("");
+    console.log("╔═════════════════════════════════════════╗");
+    console.log("║           CHECKMATE COMPLETE            ║");
+    console.log("╚═════════════════════════════════════════╝");
+    console.log("");
+  }
+
+  // Set exit code and output appropriate marker
+  if (result.status === 0) {
+    if (jsonOutput) {
+      console.log(JSON.stringify({
+        status: 'PASS',
+        exitCode: 0
+      }));
+    } else if (!quietMode) {
+      console.log(`${CM_PASS} CheckMate requirements passed`);
+    }
+    
+    // Add emoji summary for passing specs
+    try {
+      if (result.stdout) {
+        const r = JSON.parse(result.stdout);
+        if (r.specs) {
+          const rows = r.specs.map(s => `✅ ${s.slug}`).join("\n");
+          console.log("\n" + rows);
+          console.log(`\nSummary: ${r.total}/${r.total} pass`);
+        }
+      }
+    } catch (e) {
+      // Silently continue if parsing fails
+    }
+    
+    // Reset fix count on success
+    resetFixCount();
+
+    // Display telemetry summary
+    if (!quietMode && !jsonOutput) {
+      try {
+        const t = telemetry.summary();
+        console.log(`\n💡 Tokens: ${t.tokens.toLocaleString()}  Est. Cost: $${t.cost.toFixed(4)}`);
+      } catch (e) {
+        // Silently continue if telemetry fails
+      }
+    }
+
+    process.exit(0);
   } else {
-    console.error(`${CM_FAIL} CheckMate requirements failed - Spec files were modified`);
-  }
-  process.exit(1);
-}
-
-// Forward the command to checkmate
-// Add --json flag if jsonOutput is true and it wasn't already in the args
-const finalArgs = [...checkMateArgs];
-if (jsonOutput && !checkMateArgs.includes('--json')) {
-  finalArgs.push('--json');
-}
-
-// Add --quiet flag if quietMode is true and it wasn't already in the args
-if (quietMode && !checkMateArgs.includes('--quiet')) {
-  finalArgs.push('--quiet');
-}
-
-// Add --fail-early if requested
-if (failEarly && !checkMateArgs.includes('--fail-early')) {
-  finalArgs.push('--fail-early');
-}
-
-// Ensure we capture stdout if we need to parse it for emoji summary
-const stdioOptions = jsonOutput ? 'pipe' : 'inherit';
-const result = spawnSync('npx', ['checkmate', ...finalArgs], {
-  stdio: stdioOptions,
-  encoding: 'utf8'
-});
-
-// Display footer unless quiet mode or JSON output
-if (!quietMode && !jsonOutput) {
-  console.log("");
-  console.log("╔═════════════════════════════════════════╗");
-  console.log("║           CHECKMATE COMPLETE            ║");
-  console.log("╚═════════════════════════════════════════╝");
-  console.log("");
-}
-
-// Set exit code and output appropriate marker
-if (result.status === 0) {
-  if (jsonOutput) {
-    console.log(JSON.stringify({
-      status: 'PASS',
-      exitCode: 0
-    }));
-  } else if (!quietMode) {
-    console.log(`${CM_PASS} CheckMate requirements passed`);
-  }
-  
-  // Add emoji summary for passing specs
-  try {
-    if (result.stdout) {
-      const r = JSON.parse(result.stdout);
-      if (r.specs) {
-        const rows = r.specs.map(s => `✅ ${s.slug}`).join("\n");
-        console.log("\n" + rows);
-        console.log(`\nSummary: ${r.total}/${r.total} pass`);
+    // Handle fix attempts counting
+    const maxAttempts = getMaxFixAttempts();
+    const currentCount = getFixCount();
+    
+    if (currentCount + 1 >= maxAttempts) {
+      if (!quietMode) {
+        console.error(`${CM_FAIL} Max automatic fix attempts (${maxAttempts}) reached`);
+      }
+      process.exit(2); // Special exit code for max attempts
+    }
+    
+    // Increment the fix counter
+    updateFixCount(currentCount + 1);
+    
+    if (jsonOutput) {
+      console.log(JSON.stringify({
+        status: 'FAIL',
+        fixAttempt: currentCount + 1,
+        maxAttempts: maxAttempts,
+        exitCode: 1
+      }));
+    } else if (!quietMode) {
+      console.error(`${CM_FAIL} CheckMate requirements failed (fix attempt ${currentCount + 1}/${maxAttempts})`);
+    }
+    
+    // Add emoji summary for failing specs
+    try {
+      if (result.stdout) {
+        const r = JSON.parse(result.stdout);
+        if (r.specs) {
+          const rows = r.specs.map(s =>
+            `${s.pass ? "✅" : "❌"} ${s.slug}`).join("\n");
+          console.log("\n" + rows);
+          console.log(`\nSummary: ${r.totalPass}/${r.total} pass`);
+        }
+      }
+    } catch (e) {
+      // Silently continue if parsing fails
+    }
+    
+    // Display telemetry summary even on failure
+    if (!quietMode && !jsonOutput) {
+      try {
+        const t = telemetry.summary();
+        console.log(`\n💡 Tokens: ${t.tokens.toLocaleString()}  Est. Cost: $${t.cost.toFixed(4)}`);
+      } catch (e) {
+        // Silently continue if telemetry fails
       }
     }
-  } catch (e) {
-    // Silently continue if parsing fails
+    
+    process.exit(1);
   }
-  
-  // Reset fix count on success
-  resetFixCount();
-  process.exit(0);
-} else {
-  // Handle fix attempts counting
-  const maxAttempts = getMaxFixAttempts();
-  const currentCount = getFixCount();
-  
-  if (currentCount + 1 >= maxAttempts) {
-    if (!quietMode) {
-      console.error(`${CM_FAIL} Max automatic fix attempts (${maxAttempts}) reached`);
-    }
-    process.exit(2); // Special exit code for max attempts
-  }
-  
-  // Increment the fix counter
-  updateFixCount(currentCount + 1);
-  
-  if (jsonOutput) {
-    console.log(JSON.stringify({
-      status: 'FAIL',
-      fixAttempt: currentCount + 1,
-      maxAttempts: maxAttempts,
-      exitCode: 1
-    }));
-  } else if (!quietMode) {
-    console.error(`${CM_FAIL} CheckMate requirements failed (fix attempt ${currentCount + 1}/${maxAttempts})`);
-  }
-  
-  // Add emoji summary for failing specs
-  try {
-    if (result.stdout) {
-      const r = JSON.parse(result.stdout);
-      if (r.specs) {
-        const rows = r.specs.map(s =>
-          `${s.pass ? "✅" : "❌"} ${s.slug}`).join("\n");
-        console.log("\n" + rows);
-        console.log(`\nSummary: ${r.totalPass}/${r.total} pass`);
-      }
-    }
-  } catch (e) {
-    // Silently continue if parsing fails
-  }
-  
-  process.exit(1);
-} 
+})(); 
