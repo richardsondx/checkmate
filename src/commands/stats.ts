@@ -9,6 +9,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import * as telemetry from '../lib/telemetry.js';
 import path from 'path';
+import fs from 'fs';
 
 // Ensure telemetry is initialized 
 telemetry.startSession('stats');
@@ -34,6 +35,11 @@ const argv = yargs(hideBin(process.argv))
     type: 'boolean',
     description: 'Output in JSON format',
   })
+  .option('detailed', {
+    alias: 'd',
+    type: 'boolean',
+    description: 'Show detailed breakdown of each API request',
+  })
   .help()
   .parseSync();
 
@@ -49,6 +55,14 @@ function formatNumber(num: number): string {
  */
 function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`;
+}
+
+/**
+ * Format datetime
+ */
+function formatDateTime(timestamp: string): string {
+  const date = new Date(timestamp);
+  return date.toLocaleString();
 }
 
 /**
@@ -98,6 +112,145 @@ function displayStatsTable(summary: ReturnType<typeof telemetry.summary>): void 
   }
 }
 
+/**
+ * Display detailed breakdown of individual API requests
+ */
+function displayDetailedBreakdown(): void {
+  const folderPath = path.join(process.cwd(), '.checkmate-telemetry');
+  if (!fs.existsSync(folderPath)) {
+    console.log(chalk.yellow('\nNo telemetry data found.'));
+    return;
+  }
+
+  // Get list of files based on filters
+  let files: string[] = [];
+  
+  if (argv.session) {
+    // Filter by session ID
+    const sessionId = String(argv.session);
+    files = fs.readdirSync(folderPath)
+      .filter(file => file.endsWith('.jsonl') && file.startsWith(sessionId))
+      .map(file => path.join(folderPath, file));
+  } else if (argv.since) {
+    // Filter by time
+    const sinceTime = new Date().getTime() - telemetry.parseTimeFilter(String(argv.since));
+    
+    files = fs.readdirSync(folderPath)
+      .filter(file => file.endsWith('.jsonl'))
+      .filter(file => {
+        const stats = fs.statSync(path.join(folderPath, file));
+        const fileTime = new Date(stats.mtime).getTime();
+        return fileTime >= sinceTime;
+      })
+      .map(file => path.join(folderPath, file));
+  } else if (argv.all) {
+    // All files
+    files = fs.readdirSync(folderPath)
+      .filter(file => file.endsWith('.jsonl'))
+      .map(file => path.join(folderPath, file));
+  } else {
+    // Current session or most recent
+    const currentSession = telemetry.getCurrentSession();
+    if (currentSession && currentSession.id) {
+      files = fs.readdirSync(folderPath)
+        .filter(file => file.endsWith('.jsonl') && file.startsWith(currentSession.id))
+        .map(file => path.join(folderPath, file));
+    } else {
+      // Get most recent file
+      const recentFiles = fs.readdirSync(folderPath)
+        .filter(file => file.endsWith('.jsonl'))
+        .map(file => ({
+          name: file,
+          time: fs.statSync(path.join(folderPath, file)).mtime.getTime()
+        }))
+        .sort((a, b) => b.time - a.time);
+      
+      if (recentFiles.length > 0) {
+        files = [path.join(folderPath, recentFiles[0].name)];
+      }
+    }
+  }
+
+  if (files.length === 0) {
+    console.log(chalk.yellow('\nNo matching telemetry data found.'));
+    return;
+  }
+
+  // Create detailed table
+  const detailedTable = new Table({
+    head: [
+      chalk.cyan('Timestamp'),
+      chalk.cyan('Command'),
+      chalk.cyan('Provider/Model'),
+      chalk.cyan('Input'),
+      chalk.cyan('Output'),
+      chalk.cyan('Total'),
+      chalk.cyan('Est. Cost'),
+      chalk.cyan('Duration (ms)'),
+    ],
+    style: {
+      head: [], // Disable colors in header
+    },
+    colWidths: [24, 12, 30, 10, 10, 10, 10, 12],
+  });
+
+  let totalRequests = 0;
+  let skippedEntries = 0;
+
+  // Process each file
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(file, 'utf8');
+      const lines = content.split('\n').filter(Boolean);
+      
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line);
+          
+          // Skip session start entries
+          if (entry.provider === 'system') continue;
+          
+          totalRequests++;
+          
+          // Calculate cost
+          const modelKey = `${entry.provider}/${entry.model}`;
+          const price = telemetry.getPricing(entry.provider, entry.model);
+          const totalTokens = entry.in + entry.out;
+          const cost = (totalTokens / 1000) * price;
+          
+          detailedTable.push([
+            formatDateTime(entry.ts),
+            entry.cmd,
+            `${entry.provider}/${entry.model}`,
+            formatNumber(entry.in),
+            formatNumber(entry.out),
+            formatNumber(totalTokens),
+            formatCost(cost),
+            entry.ms ? formatNumber(entry.ms) : 'N/A',
+          ]);
+          
+        } catch (error) {
+          skippedEntries++;
+        }
+      }
+    } catch (error) {
+      console.error(`Error reading file ${file}:`, error);
+    }
+  }
+
+  if (totalRequests === 0) {
+    console.log(chalk.yellow('\nNo API requests found in the selected period.'));
+    return;
+  }
+
+  console.log(chalk.bold(`\n📊 Detailed API Request Breakdown (${totalRequests} requests)\n`));
+  console.log(detailedTable.toString());
+  
+  if (skippedEntries > 0) {
+    console.log(chalk.yellow(`\nNote: Skipped ${skippedEntries} invalid entries.`));
+  }
+}
+
 // Main execution
 (async () => {
   let usageSummary;
@@ -142,6 +295,11 @@ function displayStatsTable(summary: ReturnType<typeof telemetry.summary>): void 
 
   // Display table
   displayStatsTable(usageSummary);
+  
+  // Show detailed breakdown if requested
+  if (argv.detailed) {
+    displayDetailedBreakdown();
+  }
   
   // Footer
   console.log(`\nTotal tokens: ${formatNumber(usageSummary.tokens)}`);

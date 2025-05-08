@@ -229,6 +229,7 @@ When you save code changes, Cursor automatically:
 | `checkmate reset --all` | Reset all specs back to unchecked state |
 | `checkmate watch` | Live ASCII dashboard that updates in real-time as specs run |
 | `checkmate model set <tier> <model>` | Swap the model in the config |
+| `checkmate stats` | Display token usage statistics for the current session |
 
 ### Advanced Commands
 
@@ -255,6 +256,10 @@ When you save code changes, Cursor automatically:
 | `checkmate auto` | `--spec <slug>` | Enable auto-file discovery |
 | `checkmate snap` | `--detect` | Find file renames |
 | | `--repair` | Fix specs after refactoring |
+| `checkmate stats` | `--all` | Show stats for all sessions |
+| | `--since <time>` | Show stats for a specific time period (e.g., 24h, 7d) |
+| | `--session <id>` | Show stats for a specific session |
+| | `--json` | Output in JSON format |
 
 ---
 
@@ -353,6 +358,7 @@ For more detailed information about CheckMate, check out these guides:
 - [Advanced Features](wiki/Advanced-Features.md) - Power user features
 - [Spec Types](wiki/Spec-Types.md) - User Specs vs Agent Specs
 - [Developer Guide](wiki/Developer-Guide.md) - Contribute to CheckMate
+- [Telemetry Guide](wiki/Telemetry-Guide.md) - Token usage tracking and statistics
 
 ---
 

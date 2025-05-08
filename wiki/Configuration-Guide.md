@@ -130,6 +130,24 @@ lint:
   trivial_assert: error # Fail when test block contains only literals like 'return true'
 ```
 
+### Telemetry Configuration
+
+| Option | Description |
+|--------|-------------|
+| `telemetry.enabled` | Enable or disable telemetry collection (true/false) |
+| `telemetry.retention` | Number of days to retain telemetry data (default: 30) |
+
+Example:
+
+```yaml
+# Telemetry Settings
+telemetry:
+  enabled: true
+  retention: 30
+```
+
+Telemetry data is stored in the `.checkmate-telemetry/` directory, which is automatically added to `.gitignore` during initialization. This data includes token usage and cost information for AI model interactions.
+
 ## Complete Configuration Example
 
 Here's a complete example showing all configuration options:
@@ -164,6 +182,11 @@ auto_fix:
 lint:
   empty_checks: error
   trivial_assert: error
+
+# Telemetry Configuration
+telemetry:
+  enabled: true
+  retention: 30
 ```
 
 ## Environment Variables

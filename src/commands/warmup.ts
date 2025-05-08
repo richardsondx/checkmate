@@ -11,13 +11,15 @@ import clipboardy from 'clipboardy';
 import { printBanner } from '../ui/banner.js';
 import { load as loadConfig } from '../lib/config.js';
 import { buildContext } from '../lib/context.js';
-// Use @ts-ignore to avoid the analyzer import error
-// @ts-ignore
-import { analyzeCodebase } from '../lib/analyzer.js';
+import { extractActionBullets } from '../lib/bullet-x.js';
 import { SpecDraft } from './draft.js';
 import { execSync } from 'node:child_process';
 // Use the save command functions
 import { saveCommand } from './save.js';
+// Import readline for interactive mode
+import readline from 'node:readline';
+// Import features command for feature detection
+import { getFeaturesData, FeatureInfo } from './features.js';
 
 interface WarmupOptions {
   output?: 'json' | 'yaml' | 'table';
@@ -28,6 +30,7 @@ interface WarmupOptions {
   quiet?: boolean;
   debug?: boolean;
   cursor?: boolean; // Flag for Cursor integration
+  rewrite?: boolean; // Rewrite existing specs with consistent bullets
 }
 
 // Format for Cursor integration
@@ -35,18 +38,211 @@ const CM_PASS = '[CM-PASS]';
 const CM_FAIL = '[CM-FAIL]';
 
 /**
+ * Handle the rewrite flag to update existing specs with consistent bullets
+ */
+async function handleRewriteExistingSpecs(options: WarmupOptions): Promise<void> {
+  // Only proceed if rewrite flag is enabled
+  if (!options.rewrite) return;
+
+  // Get all existing spec files
+  const specDir = 'checkmate/specs';
+  if (!fs.existsSync(specDir)) {
+    console.error(`Specs directory ${specDir} does not exist.`);
+    return;
+  }
+
+  console.log(chalk.cyan('🔄 Rewriting existing specs with consistent bullets...'));
+  
+  // Find all markdown spec files
+  const specFiles = fs.readdirSync(specDir)
+    .filter(file => file.endsWith('.md'))
+    .map(file => path.join(specDir, file));
+  
+  if (specFiles.length === 0) {
+    console.log(chalk.yellow('No specs found to rewrite.'));
+    return;
+  }
+  
+  console.log(chalk.cyan(`Found ${specFiles.length} specs to process.`));
+  let updatedCount = 0;
+  
+  // Process each spec
+  for (const specFile of specFiles) {
+    try {
+      const updated = await rewriteExistingSpecs(specFile, options);
+      if (updated) updatedCount++;
+    } catch (error) {
+      console.error(`Error rewriting spec ${specFile}:`, error);
+    }
+  }
+  
+  console.log(chalk.green(`✅ Updated ${updatedCount} out of ${specFiles.length} specs.`));
+}
+
+/**
+ * Rewrite a single spec file with consistent bullets
+ */
+async function rewriteSpec(specFile: string, options: WarmupOptions): Promise<boolean> {
+  try {
+    // Read the spec file
+    const specContent = fs.readFileSync(specFile, 'utf8');
+    
+    // Try to get files from both the Files section and meta JSON
+    let files: string[] = [];
+    
+    // Method 1: Check the Files markdown section
+    const fileMatch = specContent.match(/## Files\s*\n([\s\S]*?)(?:\n##|\n$)/);
+    if (fileMatch) {
+      const filesSection = fileMatch[1];
+      files = filesSection
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.startsWith('- '))
+        .map(line => line.substring(2).trim())
+        .filter(Boolean);
+    }
+    
+    // Method 2: Parse from meta JSON if no files found
+    if (files.length === 0) {
+      // Try to extract files from the JSON meta section
+      const metaMatch = specContent.match(/<!-- meta:\s*\n([\s\S]*?)\n-->/);
+      if (metaMatch) {
+        try {
+          const metaJson = JSON.parse(metaMatch[1]);
+          if (metaJson.files && Array.isArray(metaJson.files)) {
+            files = metaJson.files;
+          }
+        } catch (error) {
+          // Error parsing JSON, continue with empty files
+          if (!options.quiet) {
+            console.log(chalk.yellow(`⚠️ Error parsing meta JSON in ${specFile}`));
+          }
+        }
+      }
+    }
+    
+    // Skip if no files are found
+    if (files.length === 0) {
+      if (!options.quiet) {
+        console.log(chalk.yellow(`⚠️ No files found in ${specFile}`));
+      }
+      return false;
+    }
+    
+    // Find the Checks section
+    const checksIndex = specContent.indexOf('## Checks');
+    if (checksIndex === -1) {
+      if (!options.quiet) {
+        console.log(chalk.yellow(`⚠️ No Checks section found in ${specFile}`));
+      }
+      return false;
+    }
+    
+    // Read file contents for extraction
+    const fileContents: Record<string, string> = {};
+    let validFiles = 0;
+    for (const file of files) {
+      try {
+        // Skip file paths starting with ./
+        const normalizedPath = file.startsWith('./') ? file.substring(2) : file;
+        if (fs.existsSync(normalizedPath)) {
+          fileContents[normalizedPath] = fs.readFileSync(normalizedPath, 'utf8');
+          validFiles++;
+        } else if (!options.quiet) {
+          console.log(chalk.yellow(`⚠️ File not found: ${normalizedPath}`));
+        }
+      } catch (error) {
+        // Skip files that can't be read
+        if (!options.quiet) {
+          console.log(chalk.yellow(`⚠️ Error reading file: ${file}`));
+        }
+      }
+    }
+    
+    // Skip if no valid files are found
+    if (validFiles === 0) {
+      if (!options.quiet) {
+        console.log(chalk.yellow(`⚠️ No readable files for ${specFile}`));
+      }
+      return false;
+    }
+    
+    // Extract action bullets using the bullet-x library
+    const bullets = await extractActionBullets(fileContents, {
+      limit: 15,
+      temperature: 0.2
+    });
+    
+    // Find the end of the Checks section
+    const nextSectionMatch = specContent.substring(checksIndex).match(/\n##\s/);
+    const endOfChecksIndex = nextSectionMatch && nextSectionMatch.index !== undefined
+      ? checksIndex + nextSectionMatch.index 
+      : specContent.length;
+    
+    // Create new Checks section
+    let newChecksSection = '## Checks\n\n';
+    for (const bullet of bullets) {
+      newChecksSection += `- [ ] ${bullet}\n`;
+    }
+    
+    // Construct the new content
+    const newContent = 
+      specContent.substring(0, checksIndex) + 
+      newChecksSection + 
+      specContent.substring(endOfChecksIndex);
+    
+    // Write the updated spec
+    fs.writeFileSync(specFile, newContent, 'utf8');
+    
+    if (!options.quiet) {
+      console.log(chalk.green(`✅ Updated ${path.basename(specFile)} with ${bullets.length} bullets`));
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error rewriting spec ${specFile}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Rewrite existing specs with consistent bullets
+ * This is a separate function from the main warmup command
+ * that focuses specifically on rewriting existing specs
+ */
+async function rewriteExistingSpecs(specFile: string, options: WarmupOptions): Promise<boolean> {
+  try {
+    // Implementation is the same as rewriteSpec, but adds logging
+    if (!options.quiet) {
+      console.log(chalk.cyan(`🔄 Rewriting spec: ${path.basename(specFile)}`));
+    }
+    
+    return await rewriteSpec(specFile, options);
+  } catch (error) {
+    console.error(`Error rewriting spec ${specFile}:`, error);
+    return false;
+  }
+}
+
+/**
  * Warmup command handler
  * Scans a repository and generates draft specs without writing to disk
  */
-export async function warmupCommand(options: WarmupOptions = {}): Promise<SpecDraft[]> {
+export async function warmupCommand(options: WarmupOptions = {}): Promise<any[]> {
   // Set defaults
   options.interactive = options.interactive !== false && !options.yes;
   options.output = options.output || 'yaml';
   
+  // Handle rewrite option if enabled
+  if (options.rewrite) {
+    await handleRewriteExistingSpecs(options);
+    return [];
+  }
+  
   // Print welcome banner if not quiet
   if (!options.quiet) {
     printBanner();
-  console.log(chalk.cyan('\n🔍 Scanning repository and analyzing code patterns...'));
+    console.log(chalk.cyan('\n🔍 Scanning repository and analyzing code patterns...'));
   }
   
   const spinner = options.quiet ? null : ora('Building repository context...').start();
@@ -69,16 +265,35 @@ export async function warmupCommand(options: WarmupOptions = {}): Promise<SpecDr
       return [];
     }
     
-    // Load file contents for the top N files
-    const topN = options.topFiles || 100;
+    // Limit number of files even further to avoid token issues
+    // Load file contents for the top N files, but cap at 50 for large repositories
+    const topN = Math.min(options.topFiles || 100, 50);
     const filesToProcess = projectFiles.slice(0, topN);
     
     if (spinner) spinner.text = `Loading content for ${filesToProcess.length} files...`;
     
+    // Track overall content size to avoid exceeding model limits
+    let totalContentSize = 0;
+    const MAX_CONTENT_SIZE = 1000000; // 1MB max total content to analyze
+    
     for (const file of filesToProcess) {
       try {
         const content = fs.readFileSync(file, 'utf8');
+        
+        // Skip extremely large files
+        if (content.length > 50000) { // 50KB per file max
+          if (!options.quiet) console.warn(`Skipping large file: ${file} (${Math.round(content.length/1024)}KB)`);
+          continue;
+        }
+        
         contextMap[file] = content;
+        totalContentSize += content.length;
+        
+        // Stop once we've collected enough content
+        if (totalContentSize > MAX_CONTENT_SIZE) {
+          if (!options.quiet) console.warn(`Limiting analysis to ${Object.keys(contextMap).length} files to avoid token limit issues`);
+          break;
+        }
       } catch (error) {
         // Skip files that can't be read
         if (!options.quiet) console.warn(`Warning: Could not read file ${file}`);
@@ -87,12 +302,12 @@ export async function warmupCommand(options: WarmupOptions = {}): Promise<SpecDr
     
     if (spinner) spinner.succeed('Repository context built successfully');
     if (spinner) {
-    spinner.text = 'Analyzing codebase for feature patterns...';
-    spinner.start();
+      spinner.text = 'Analyzing codebase for feature patterns...';
+      spinner.start();
     }
     
-    // Use the built context to analyze the codebase
-    let drafts = await analyzeCodebase(contextMap);
+    // Group related files and extract drafts
+    const drafts = await generateDraftsFromContext(contextMap, options);
     
     if (spinner) spinner.succeed(`Found ${drafts.length} potential feature specifications`);
     
@@ -123,7 +338,7 @@ export async function warmupCommand(options: WarmupOptions = {}): Promise<SpecDr
       }
       
       // Copy slugs to clipboard
-      const slugs = drafts.map((draft: SpecDraft) => draft.slug);
+      const slugs = drafts.map((draft: any) => draft.slug);
       await clipboardy.write(slugs.join('\n'));
       console.log(chalk.cyan(`📎 Copied spec list to clipboard (${slugs.length} slugs)`));
       
@@ -145,11 +360,235 @@ export async function warmupCommand(options: WarmupOptions = {}): Promise<SpecDr
     if (options.cursor) {
       console.error(`${CM_FAIL} Error: ${error.message}`);
     } else {
-    console.error(chalk.red(`Error: ${error.message}`));
+      console.error(chalk.red(`Error: ${error.message}`));
     }
     
     throw error;
   }
+}
+
+/**
+ * Generate draft specs from the codebase context
+ */
+async function generateDraftsFromContext(
+  contextMap: Record<string, string>,
+  options: WarmupOptions
+): Promise<any[]> {
+  // Instead of grouping files by directory, use the features command
+  // to identify actual application features
+  console.log(chalk.blue('🔍 Identifying features from codebase...'));
+  const features = await getFeaturesData({ analyze: true });
+  console.log(chalk.green(`✅ Found ${features.length} features`));
+  
+  // For each feature, generate a draft spec
+  const drafts = [];
+  
+  // Limit the number of features to process
+  const MAX_FEATURES = 5;
+  const featuresToProcess = features.slice(0, MAX_FEATURES);
+  
+  if (features.length > MAX_FEATURES && !options.quiet) {
+    console.log(chalk.yellow(`⚠️ Limiting analysis to ${MAX_FEATURES} features (out of ${features.length}) to avoid token limits`));
+  }
+
+  for (const feature of featuresToProcess) {
+    try {
+      console.log(chalk.blue(`📝 Processing feature: ${feature.title}`));
+      
+      // Find files related to this feature
+      const featureFiles = findFilesForFeature(feature, contextMap);
+      
+      // Skip if no files found for this feature
+      if (featureFiles.length === 0) {
+        if (!options.quiet) {
+          console.log(chalk.yellow(`⚠️ No files found for feature "${feature.title}"`));
+        }
+        continue;
+      }
+      
+      console.log(chalk.green(`✅ Found ${featureFiles.length} files for feature "${feature.title}"`));
+      
+      // Extract just the files and contents for this feature
+      const featureContext: Record<string, string> = {};
+      
+      // Limit files per feature to avoid token limit issues
+      const MAX_FILES_PER_FEATURE = 10;
+      const filesToInclude = featureFiles.slice(0, MAX_FILES_PER_FEATURE);
+      
+      if (featureFiles.length > MAX_FILES_PER_FEATURE && !options.quiet) {
+        console.log(chalk.yellow(`⚠️ Limiting feature "${feature.title}" to ${MAX_FILES_PER_FEATURE} files (out of ${featureFiles.length})`));
+      }
+      
+      for (const file of filesToInclude) {
+        if (contextMap[file]) {
+          featureContext[file] = contextMap[file];
+        }
+      }
+      
+      // Skip if there are no files in the feature
+      if (Object.keys(featureContext).length === 0) {
+        if (!options.quiet) {
+          console.log(chalk.yellow(`⚠️ No content found for files in feature "${feature.title}"`));
+        }
+        continue;
+      }
+      
+      // Use feature title and slug directly
+      const featureTitle = feature.title;
+      const slug = feature.slug;
+      
+      console.log(chalk.blue(`🧠 Extracting action bullets for "${featureTitle}"...`));
+      
+      // Extract action bullets focused on feature acceptance criteria
+      const actionBullets = await extractActionBullets(featureContext, {
+        limit: 10,
+        temperature: 0.4
+      });
+      
+      // Skip if no action bullets were extracted
+      if (actionBullets.length === 0) {
+        if (!options.quiet) {
+          console.log(chalk.yellow(`⚠️ No action bullets extracted for feature "${featureTitle}"`));
+        }
+        continue;
+      }
+      
+      console.log(chalk.green(`✅ Extracted ${actionBullets.length} action bullets for "${featureTitle}"`));
+      
+      // Create a draft spec
+      const draft = {
+        slug,
+        title: featureTitle,
+        files: filesToInclude,
+        checks: actionBullets,
+        meta: {
+          files_auto: true,
+          feature: featureTitle,
+          feature_type: feature.type,
+          feature_category: feature.category,
+          file_hashes: filesToInclude.reduce((acc: Record<string, string>, file: string) => {
+            // Generate a simple hash from the first 100 chars of the file content
+            const content = contextMap[file] || '';
+            const hash = Buffer.from(content.slice(0, 100)).toString('base64');
+            acc[file] = hash;
+            return acc;
+          }, {})
+        }
+      };
+      
+      drafts.push(draft);
+      console.log(chalk.green(`✅ Created draft spec for "${featureTitle}"`));
+    } catch (error) {
+      console.error(chalk.red(`❌ Error generating draft for feature "${feature.title}":`, error));
+      // Continue with other features
+    }
+  }
+  
+  console.log(chalk.green(`✅ Generated ${drafts.length} draft specs from features`));
+  return drafts;
+}
+
+/**
+ * Find files that are relevant to a specific feature
+ */
+function findFilesForFeature(feature: FeatureInfo, contextMap: Record<string, string>): string[] {
+  // Start with any files already associated with the feature
+  const featureFiles: string[] = [];
+  const allFiles = Object.keys(contextMap);
+  
+  // If feature already has files from a spec, use those
+  if (feature.filePath && fs.existsSync(feature.filePath)) {
+    try {
+      const specContent = fs.readFileSync(feature.filePath, 'utf8');
+      
+      // Extract files from spec content
+      const fileMatch = specContent.match(/## Files\s*\n([\s\S]*?)(?:\n##|\n$)/);
+      if (fileMatch) {
+        const filesSection = fileMatch[1];
+        const filesList = filesSection
+          .split('\n')
+          .map(line => line.trim())
+          .filter(line => line.startsWith('- '))
+          .map(line => line.substring(2).trim())
+          .filter(Boolean);
+        
+        filesList.forEach(file => {
+          // Check if file exists
+          if (fs.existsSync(file)) {
+            featureFiles.push(file);
+          }
+        });
+      }
+    } catch (error) {
+      // Skip error reading spec file
+    }
+  }
+  
+  // If we already have enough files, return them
+  if (featureFiles.length >= 3) {
+    return featureFiles;
+  }
+  
+  // Otherwise, try to find files related to this feature based on keywords
+  const title = feature.title.toLowerCase();
+  const titleWords = title.split(/\W+/).filter(word => word.length > 3);
+  const slug = feature.slug.toLowerCase();
+  const slugParts = slug.split('-').filter(part => part.length > 3);
+  
+  // Create a set of keywords to search for
+  const keywords = new Set([
+    ...titleWords,
+    ...slugParts,
+    feature.category?.toLowerCase() || ''
+  ].filter(Boolean));
+  
+  // Score each file based on content and path relevance
+  const scoredFiles: {file: string, score: number}[] = [];
+  
+  for (const file of allFiles) {
+    // Skip files already in featureFiles
+    if (featureFiles.includes(file)) {
+      continue;
+    }
+    
+    // Calculate score based on file name and content
+    let score = 0;
+    const content = contextMap[file].toLowerCase();
+    const fileName = path.basename(file).toLowerCase();
+    
+    // Check keywords in file path and name
+    for (const keyword of keywords) {
+      if (file.toLowerCase().includes(keyword)) {
+        score += 2;
+      }
+      if (fileName.includes(keyword)) {
+        score += 5;
+      }
+    }
+    
+    // Check keyword frequency in content
+    for (const keyword of keywords) {
+      const regex = new RegExp(keyword, 'gi');
+      const matches = content.match(regex);
+      if (matches) {
+        score += Math.min(matches.length, 10); // Cap at 10 to avoid bias towards large files
+      }
+    }
+    
+    // Add file to scored list if it has any score
+    if (score > 0) {
+      scoredFiles.push({ file, score });
+    }
+  }
+  
+  // Sort by score (highest first) and take top files
+  const topFiles = scoredFiles
+    .sort((a, b) => b.score - a.score)
+    .map(item => item.file)
+    .slice(0, 10);
+  
+  // Combine with existing feature files
+  return [...new Set([...featureFiles, ...topFiles])];
 }
 
 /**
@@ -158,12 +597,33 @@ export async function warmupCommand(options: WarmupOptions = {}): Promise<SpecDr
  * For now, we use a simpler format for the TUI (non-interactive).
  * We'll display all specs in a table and ask the user to confirm.
  */
-async function handleInteractiveMode(drafts: SpecDraft[], options: WarmupOptions): Promise<SpecDraft[]> {
+async function handleInteractiveMode(drafts: any[], options: WarmupOptions): Promise<any[]> {
   console.log(chalk.bold(`\nCheckMate Warm-up • ${drafts.length} specs detected\n`));
   
-  // Display specs in a table format
+  // Display specs in a table format with previews of checks
   drafts.forEach((draft, index) => {
     console.log(chalk.cyan(`[${index + 1}] ${draft.title} (${draft.checks.length} checks, ${draft.files.length} files)`));
+    
+    // Display preview of the checks
+    console.log(chalk.dim('   Checks preview:'));
+    draft.checks.forEach((check: string) => {
+      console.log(chalk.dim(`   • ${check}`));
+    });
+    
+    // Display a few of the files
+    const filesToShow = draft.files.slice(0, 3);
+    const remainingFiles = draft.files.length - filesToShow.length;
+    
+    console.log(chalk.dim('   Files:'));
+    filesToShow.forEach((file: string) => {
+      console.log(chalk.dim(`   - ${file}`));
+    });
+    
+    if (remainingFiles > 0) {
+      console.log(chalk.dim(`   - ... and ${remainingFiles} more file${remainingFiles === 1 ? '' : 's'}`));
+    }
+    
+    console.log(''); // Add a blank line between specs for readability
   });
   
   console.log('\n' + chalk.yellow('Interactive selection mode is not yet available in this build.'));
@@ -199,7 +659,7 @@ async function handleInteractiveMode(drafts: SpecDraft[], options: WarmupOptions
         }
         
         // Copy slugs to clipboard
-        const slugs = drafts.map((draft: SpecDraft) => draft.slug);
+        const slugs = drafts.map((draft: any) => draft.slug);
         await clipboardy.write(slugs.join('\n'));
         console.log(chalk.cyan(`📎 Copied spec list to clipboard (${slugs.length} slugs)`));
         
@@ -219,13 +679,13 @@ async function handleInteractiveMode(drafts: SpecDraft[], options: WarmupOptions
 /**
  * Output drafts in the specified format
  */
-function outputDrafts(drafts: SpecDraft[], options: WarmupOptions) {
+function outputDrafts(drafts: any[], options: WarmupOptions) {
   // Clean up drafts for output if not in debug mode
   if (!options.debug) {
     drafts = drafts.map(draft => {
       // Create a shallow copy without meta
       const { meta, ...cleanDraft } = draft as any;
-      return cleanDraft as SpecDraft;
+      return cleanDraft as any;
     });
   }
   
@@ -237,10 +697,28 @@ function outputDrafts(drafts: SpecDraft[], options: WarmupOptions) {
     console.log(chalk.bold('\nProposed Specifications:'));
     console.log(chalk.dim('────────────────────────────────────────────────────────'));
     
-    drafts.forEach((draft: SpecDraft, index: number) => {
+    drafts.forEach((draft: any, index: number) => {
       console.log(chalk.cyan(`${index + 1}. ${draft.title}`));
-      console.log(chalk.dim(`   Files: ${draft.files.length} files`));
-      console.log(chalk.dim(`   Checks: ${draft.checks.length}`));
+      
+      // Display checks for better preview
+      console.log(chalk.dim(`   Checks (${draft.checks.length}):`));
+      draft.checks.forEach((check: string) => {
+        console.log(chalk.dim(`   • ${check}`));
+      });
+      
+      // Display a sample of files
+      const filesToShow = draft.files.slice(0, 3);
+      const remainingFiles = draft.files.length - filesToShow.length;
+      
+      console.log(chalk.dim(`   Files (${draft.files.length} total):`));
+      filesToShow.forEach((file: string) => {
+        console.log(chalk.dim(`   - ${file}`));
+      });
+      
+      if (remainingFiles > 0) {
+        console.log(chalk.dim(`   - ... and ${remainingFiles} more file${remainingFiles === 1 ? '' : 's'}`));
+      }
+      
       console.log(chalk.dim('────────────────────────────────────────────────────────'));
     });
   }
@@ -255,6 +733,24 @@ function outputDrafts(drafts: SpecDraft[], options: WarmupOptions) {
 }
 
 /**
+ * Create a slug from a title
+ */
+function createSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 50);
+}
+
+/**
+ * Capitalize the first letter of a string
+ */
+function capitalizeFirstLetter(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
  * Get list of files in the project
  */
 function getProjectFiles(): string[] {
@@ -264,29 +760,52 @@ function getProjectFiles(): string[] {
     const treeCmd = config.tree_cmd || "git ls-files | grep -E '\\\\.(ts|js|tsx|jsx)$'";
     
     try {
-    // Execute tree command
-    const output = execSync(treeCmd, { encoding: 'utf8' });
-    
-    // Split output by lines and clean up
+      // Execute tree command
+      const output = execSync(treeCmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+      
+      // Split output by lines and clean up
       const files = output
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.includes('node_modules'));
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean); // Filter empty lines
       
       if (files.length > 0) {
-        return files;
+        // Additional filtering to exclude non-application files
+        const filteredFiles = files.filter(file => {
+          // Skip common non-application paths
+          const excludePaths = [
+            'node_modules/',
+            '.git/',
+            'dist/',
+            'build/',
+            'checkmate/',
+            '.checkmate-telemetry/',
+            '.cursor/',
+            'dist-test/',
+            'tests/',
+            'test/',
+            'scripts/',
+            'wiki/',
+            'memory-docs/',
+            'examples/',
+            'examples.bak/',
+            'temp-test/'
+          ];
+          
+          return !excludePaths.some(excludePath => 
+            file.startsWith(excludePath) || file.includes('/' + excludePath)
+          );
+        });
+        
+        return filteredFiles;
       } else {
         // Fall back to filesystem search if no files found via git
         console.log('No files found via git, falling back to filesystem search...');
         return findFilesRecursive();
       }
     } catch (error) {
-      if ((error as any).stderr?.includes('not a git repository')) {
-        console.log('Not in a git repository, using filesystem search instead...');
-      } else {
-        console.error('Error running git command:', error);
-        console.log('Falling back to filesystem search...');
-      }
+      // More graceful error handling for git command failures
+      console.log('Git command failed, using filesystem search instead...');
       return findFilesRecursive();
     }
   } catch (error) {
@@ -301,33 +820,61 @@ function getProjectFiles(): string[] {
  */
 function findFilesRecursive(dir = '.', fileList: string[] = []): string[] {
   try {
-  const files = fs.readdirSync(dir);
-  
-  files.forEach(file => {
-    const filePath = path.join(dir, file);
+    const files = fs.readdirSync(dir);
     
-      // Skip node_modules, .git, and other common non-source directories
-      if (filePath.includes('node_modules') || 
-          filePath.includes('.git') || 
-          filePath.includes('dist') || 
-          filePath.includes('build')) {
-      return;
-    }
-    
+    files.forEach(file => {
+      const filePath = path.join(dir, file);
+      
+      // Normalize paths for more reliable matching
+      const normalizedPath = path.normalize(filePath);
+      
+      // Expanded list of directories to exclude
+      const exclusions = [
+        'node_modules',
+        '.git',
+        'dist',
+        'build',
+        'checkmate', // Exclude checkmate's own infrastructure
+        '.checkmate-telemetry', // Exclude telemetry data 
+        '.cursor', // Exclude cursor config
+        'dist-test', // Exclude test builds
+        'tests', // Exclude test directories
+        'test', // Common test directory name
+        'scripts', // Often contains build/utility scripts, not app features
+        'wiki', // Documentation, not code
+        'memory-docs', // Documentation, not code
+        'examples', // Examples, not core app code
+        'examples.bak', // Backup examples
+        'temp-test' // Temporary test files
+      ];
+
+      // Check if this file should be excluded
+      // We need to check if the path contains any of these patterns as directories
+      // e.g. "node_modules/", ".git/", etc.
+      const shouldExclude = exclusions.some(excluded => {
+        const exclusionPattern = path.sep + excluded + path.sep; // e.g. "/node_modules/"
+        const startsWithPattern = normalizedPath.startsWith(excluded + path.sep); // e.g. "node_modules/"
+        return normalizedPath.includes(exclusionPattern) || startsWithPattern;
+      });
+      
+      if (shouldExclude) {
+        return;
+      }
+      
       try {
         const stats = fs.statSync(filePath);
         if (stats.isDirectory()) {
-      findFilesRecursive(filePath, fileList);
-    } else if (/\.(ts|js|tsx|jsx)$/.test(filePath)) {
-      fileList.push(filePath);
+          findFilesRecursive(filePath, fileList);
+        } else if (/\.(ts|js|tsx|jsx)$/.test(filePath)) {
+          fileList.push(filePath);
         }
       } catch (error) {
         // Skip files that can't be accessed
         console.warn(`Warning: Could not access ${filePath}`);
-    }
-  });
-  
-  return fileList;
+      }
+    });
+    
+    return fileList;
   } catch (error) {
     console.error(`Error reading directory ${dir}:`, error);
     return fileList;
@@ -346,6 +893,7 @@ export function parseWarmupArgs(args: any): WarmupOptions {
     yes: args.yes || false,
     quiet: args.quiet || false,
     debug: args.debug || false,
-    cursor: args.cursor || false
+    cursor: args.cursor || false,
+    rewrite: args.rewrite || false
   };
 } 

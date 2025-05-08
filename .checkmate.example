@@ -28,3 +28,6 @@ pricing:
   anthropic/claude-3-opus: 0.015
   anthropic/claude-3-sonnet: 0.008
   anthropic/claude-3-haiku: 0.00025
+
+telemetry:
+  enabled: true

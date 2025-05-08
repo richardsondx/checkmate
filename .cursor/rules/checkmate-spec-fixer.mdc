@@ -1,0 +1,51 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# CheckMate · Spec Format Auto-Fixer
+
+This rule automatically fixes CheckMate spec files that don't meet format standards.
+
+```rule type=activation
+activationTrigger:
+  change:
+    include: ["checkmate/specs/**.md"]
+  maxRuns: 1
+```
+
+```rule type=on_change
+# Auto-fix the spec format on save
+if [[ "$FILEPATH" == *.md ]]; then
+  # Check if file exists and is not empty
+  if [ -s "$FILEPATH" ]; then
+    echo "🔍 Validating and auto-fixing spec format: $FILEPATH"
+    
+    # Run the validator with the fix flag
+    node scripts/validate-spec-format.js "$FILEPATH" --fix
+
+    if [ $? -eq 0 ]; then
+      echo "✅ Spec format is valid or has been fixed"
+    else
+      echo "⚠️ Could not automatically fix all issues in $FILEPATH"
+      echo "   Some manual corrections may be needed"
+    fi
+  fi
+fi
+```
+
+## About This Rule
+
+This rule works in conjunction with the normal spec validator, but instead of just reporting issues, it attempts to fix them. It will:
+
+1. Add missing `files` arrays to meta sections
+2. Add generation notes if missing
+3. Fix other common formatting issues
+
+For more complex issues that can't be auto-fixed, the rule will report what needs to be fixed manually.
+
+To invoke this rule manually on any spec file:
+
+```bash
+node scripts/validate-spec-format.js path/to/spec.md --fix
+```

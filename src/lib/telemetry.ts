@@ -86,6 +86,14 @@ export function startSession(cmd: string): void {
 }
 
 /**
+ * Get the current session information
+ * @returns Current session data or undefined if not initialized
+ */
+export function getCurrentSession(): { id: string; cmd: string } | undefined {
+  return current.id ? current : undefined;
+}
+
+/**
  * Record a telemetry entry
  * @param entry The telemetry entry to record
  */
@@ -185,7 +193,7 @@ function write(data: string): void {
  * @param model Model name
  * @returns Price per 1K tokens
  */
-function getPricing(provider: string, model: string): number {
+export function getPricing(provider: string, model: string): number {
   const config = load();
   const key = `${provider}/${model}`;
   
@@ -372,7 +380,7 @@ export function getAllSessionsSummary(options: {
  * @param timeFilter Time filter string (e.g., "24h", "7d")
  * @returns Time in milliseconds
  */
-function parseTimeFilter(timeFilter: string): number {
+export function parseTimeFilter(timeFilter: string): number {
   const match = timeFilter.match(/^(\d+)([hdwm])$/);
   if (!match) return 24 * 60 * 60 * 1000; // Default to 24h
   

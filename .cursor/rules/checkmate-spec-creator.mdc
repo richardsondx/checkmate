@@ -1,0 +1,56 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# CheckMate · New Spec Creator
+
+This rule captures when a user tries to manually create a spec file and helps them generate a proper template.
+
+```rule type=activation
+activationTrigger:
+  event: file_create
+  path: "checkmate/specs/**.md"
+  maxRuns: 1
+```
+
+```rule type=on_file_create
+# If this is a new file, offer to generate a template
+if [ ! -s "$FILEPATH" ]; then
+  FILENAME=$(basename "$FILEPATH")
+  TITLE=${FILENAME%.md}
+  
+  # Display a notification
+  echo "🧰 CheckMate Spec Creator" 
+  echo "🔍 Detected new spec file: $FILEPATH"
+  echo "📝 Do you want to generate a properly formatted spec template?"
+  echo "   This will replace the current empty file with a template."
+  echo ""
+  echo "🔵 Run this command to create the spec:"
+  echo "   node scripts/create-spec-template.js \"$TITLE\" --files=path/to/file1.js,path/to/file2.js"
+  echo ""
+  echo "✅ Or use warmup to generate specs automatically from your codebase:"
+  echo "   checkmate warmup"
+fi
+```
+
+## Spec Creation Tips
+
+This rule activates when you create a new .md file in the CheckMate specs directory. Instead of starting from scratch, you can use one of these methods to create properly formatted specs:
+
+1. **Use the template generator:**
+   ```
+   node scripts/create-spec-template.js "Feature Title" --files=file1.js,file2.js
+   ```
+
+2. **Let CheckMate analyze your code:**
+   ```
+   checkmate warmup
+   ```
+
+3. **Generate from a feature description:**
+   ```
+   checkmate gen "Feature description"
+   ```
+
+All these methods ensure your spec has the correct structure and meta information.

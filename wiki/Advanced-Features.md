@@ -196,6 +196,61 @@ Convert a regular Markdown spec to hybrid format:
 checkmate hybridize --spec user-todo-list
 ```
 
+## Token Usage Tracking and Statistics
+
+CheckMate includes built-in telemetry to track token usage and associated costs across sessions. This helps you monitor AI model usage and estimate expenses.
+
+### Viewing Token Usage Statistics
+
+Use the `stats` command to display token usage information:
+
+```bash
+# Show stats for current session
+checkmate stats
+
+# Show stats for all sessions
+checkmate stats --all
+
+# Show stats for the last 24 hours
+checkmate stats --since 24h
+
+# Show stats for a specific session ID
+checkmate stats --session <session-id>
+
+# Get output in JSON format for scripting
+checkmate stats --json
+```
+
+Example output:
+
+```
+📊 CheckMate Token Usage Statistics
+
+Period: Current session
+
+┌─────────────────────────┬──────────────┬───────────────┬──────────────┬───────────┐
+│ Model                   │ Input Tokens │ Output Tokens │ Total Tokens │ Est. Cost │
+├─────────────────────────┼──────────────┼───────────────┼──────────────┼───────────┤
+│ openai/gpt-4o           │ 5,234        │ 1,267         │ 6,501        │ $0.0650   │
+│ anthropic/claude-3-haiku│ 3,125        │ 876           │ 4,001        │ $0.0100   │
+├─────────────────────────┼──────────────┼───────────────┼──────────────┼───────────┤
+│ TOTAL                   │ 8,359        │ 2,143         │ 10,502       │ $0.0750   │
+└─────────────────────────┴──────────────┴───────────────┴──────────────┴───────────┘
+
+Total tokens: 10,502
+Estimated cost: $0.0750
+```
+
+Time filter options for `--since`:
+- Hours: `1h`, `24h`
+- Days: `1d`, `7d`, `30d`
+- Weeks: `1w`, `2w`
+- Months: `1m`, `3m`
+
+### Telemetry Data Storage
+
+All telemetry data is stored locally in the `.checkmate-telemetry/` directory, which is automatically added to `.gitignore` during initialization.
+
 ## Next Steps
 
 - [Command Reference](Command-Reference.md) - Learn all available commands

@@ -134,7 +134,7 @@ function groupFilesByDomain(context, model) {
  */
 function generateDraftFromGroup(group, context, model) {
     return __awaiter(this, void 0, void 0, function () {
-        var fileContents, _i, _a, file, prompt, response, jsonMatch, jsonStr, feature, title, slug, checks;
+        var fileContents, _i, _a, file, extractedElements, prompt, response, jsonMatch, jsonStr, feature, title, slug, checks;
         return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
@@ -143,17 +143,85 @@ function generateDraftFromGroup(group, context, model) {
                         return [2 /*return*/, null];
                     }
                     fileContents = [];
+                    extractedElements = {
+                        functions: new Set(),
+                        methods: new Set(),
+                        endpoints: new Set(),
+                        options: new Set()
+                    };
                     for (_i = 0, _a = group.files; _i < _a.length; _i++) {
                         file = _a[_i];
                         if (context[file]) {
-                            fileContents.push("File: ".concat(file, "\n").concat(context[file].slice(0, 2000)).concat(context[file].length > 2000 ? '\n... (truncated)' : ''));
+                            // Extract function names, method names, API endpoints, and CLI options
+                            var content = context[file];
+                            
+                            // Extract function declarations
+                            var functionMatches = content.match(/function\s+(\w+)\s*\(/g) || [];
+                            functionMatches.forEach(function(match) {
+                                var functionName = match.replace(/function\s+/, '').replace(/\s*\($/, '');
+                                extractedElements.functions.add(functionName);
+                            });
+                            
+                            // Extract method declarations
+                            var methodMatches = content.match(/(\w+)\s*\([^)]*\)\s*{/g) || [];
+                            methodMatches.forEach(function(match) {
+                                var methodName = match.replace(/\s*\([^)]*\)\s*{$/, '');
+                                if (methodName && !methodName.match(/^(if|for|while|switch)$/)) {
+                                    extractedElements.methods.add(methodName);
+                                }
+                            });
+                            
+                            // Extract API endpoints
+                            var routeMatches = content.match(/app\.(get|post|put|delete|patch)\s*\(\s*['"]([^'"]+)['"]/g) || [];
+                            routeMatches.forEach(function(match) {
+                                var routeMatch = match.match(/app\.(get|post|put|delete|patch)\s*\(\s*['"]([^'"]+)['"]/);
+                                if (routeMatch) {
+                                    var method = routeMatch[1];
+                                    var route = routeMatch[2];
+                                    extractedElements.endpoints.add(`${method.toUpperCase()} ${route}`);
+                                }
+                            });
+                            
+                            // Extract CLI options
+                            var optionMatches = content.match(/\.option\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/g) || [];
+                            optionMatches.forEach(function(match) {
+                                var optionMatch = match.match(/\.option\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]/);
+                                if (optionMatch) {
+                                    var option = optionMatch[1];
+                                    extractedElements.options.add(option);
+                                }
+                            });
+
+                            fileContents.push("File: ".concat(file, "\n").concat(content.slice(0, 2000)).concat(content.length > 2000 ? '\n... (truncated)' : ''));
                         }
                     }
+                    
+                    // Build extracted elements section
+                    var extractedElementsText = '';
+                    if (extractedElements.functions.size > 0) {
+                        extractedElementsText += "Functions found:\n" + 
+                            Array.from(extractedElements.functions).map(fn => `- ${fn}`).join('\n') + "\n\n";
+                    }
+                    if (extractedElements.methods.size > 0) {
+                        extractedElementsText += "Methods found:\n" + 
+                            Array.from(extractedElements.methods).map(m => `- ${m}`).join('\n') + "\n\n";
+                    }
+                    if (extractedElements.endpoints.size > 0) {
+                        extractedElementsText += "API Endpoints found:\n" + 
+                            Array.from(extractedElements.endpoints).map(e => `- ${e}`).join('\n') + "\n\n";
+                    }
+                    if (extractedElements.options.size > 0) {
+                        extractedElementsText += "CLI Options found:\n" + 
+                            Array.from(extractedElements.options).map(o => `- ${o}`).join('\n') + "\n\n";
+                    }
+                    
                     // Skip if there are no file contents
                     if (fileContents.length === 0) {
                         return [2 /*return*/, null];
                     }
-                    prompt = "\nYou are analyzing a group of related files to identify concrete functional capabilities for testing.\nThe domain for these files is: \"".concat(group.domain, "\"\n\nHere are the file contents:\n\n").concat(fileContents.join('\n\n'), "\n\nBased on these files:\n1. Provide a descriptive title for the feature\n2. Identify 4-7 SPECIFIC functions, methods, or behaviors the code actually implements\n3. Each check must reference actual code functionality, including specific function names, file operations, or API endpoints\n\nFormat each check as a specific capability that can be verified by examining the code.\nFor example:\n- \"The fileExists function should check if a file is accessible\"\n- \"The POST /users endpoint should validate email format\"\n- \"The parseConfig method should handle JSON and YAML formats\"\n\nReturn your answer as a JSON object with this structure:\n{\n  \"title\": \"Feature Title\",\n  \"checks\": [\n    \"First specific code functionality\",\n    \"Second specific code functionality\",\n    \"Third specific code functionality\"\n  ]\n}\n\nIMPORTANT: Every check MUST refer to specific functions, methods, components, or behaviors that exist in the code.\nDO NOT use generic descriptions like \"The system should be secure\". Instead, mention actual functions/methods.\n");
+                    
+                    prompt = "\nYou are analyzing a group of related files to identify concrete functional capabilities for testing.\nThe domain for these files is: \"".concat(group.domain, "\"\n\nHere are the file contents:\n\n").concat(fileContents.join('\n\n'), "\n\nI've extracted these specific code elements for your reference:\n\n").concat(extractedElementsText, "\n\nBased on these files, create a specification with these requirements:\n1. Provide a descriptive title for the feature\n2. Identify 4-7 SPECIFIC checks that directly reference the actual implementation\n\nIMPORTANT: For each check, you MUST use one of these exact formats:\n- \"The [functionName] function should [specific responsibility]\"\n- \"The [methodName] method should [specific responsibility]\"\n- \"[HTTP_METHOD] [/path] endpoint should [specific responsibility]\"\n- \"[--option-name] option should [specific responsibility]\"\n- \"handle [specific input/operation]\"\n- \"validate [specific data]\"\n- \"display [specific output]\"\n- \"process [specific data/event]\"\n\nUse the EXACT function, method, endpoint, and option names I extracted above. Priority should be given to these items that audit will look for.\n\nReturn your answer as a JSON object with this structure:\n{\n  \"title\": \"Feature Title\",\n  \"checks\": [\n    \"The example function should handle its specific responsibility\",\n    \"GET /api/example endpoint should validate input parameters\",\n    \"process configuration files in multiple formats\"\n  ]\n}\n\nEVERY CHECK MUST match the exact formats above and refer to actual elements in the code.\n");
+                    
                     return [4 /*yield*/, model.complete(prompt, {
                             temperature: 0.7,
                             max_tokens: 1000,

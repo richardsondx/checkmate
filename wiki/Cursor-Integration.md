@@ -229,4 +229,33 @@ If any check fails, you'll see:
 
 - [Command Reference](Command-Reference.md) - Learn all available commands
 - [Advanced Features](wiki/Advanced-Features.md) - Learn about power user features
-- [Spec Types](wiki/Spec-Types.md) - Understanding User Specs vs Agent Specs 
+- [Spec Types](wiki/Spec-Types.md) - Understanding User Specs vs Agent Specs
+
+## Cursor Rules
+
+CheckMate integrates with Cursor through several rule files that enhance and automate the workflow. These rules are created in the `.cursor/rules/` directory during initialization.
+
+### Available Rules
+
+| Rule File | Purpose |
+|-----------|---------|
+| `checkmate-non-interactive.mdc` | Makes CheckMate commands run in non-interactive mode when executed through Cursor |
+| `checkmate-spec-format.mdc` | Ensures proper spec formatting |
+| `checkmate-spec-drift.mdc` | Detects when specs drift from implementation |
+| `checkmate-spec-drift-on-save.mdc` | Checks for spec drift when files are saved |
+| `pre-task.mdc` | Runs before a task starts |
+| `post-task.mdc` | Runs after a task completes |
+| `post-push.mdc` | Runs after pushing changes |
+| `audit-after-fix.md` | Runs audit after fixing code |
+
+### Command Transformations
+
+The `checkmate-non-interactive.mdc` rule automatically transforms CheckMate commands to run in non-interactive mode when executed by Cursor:
+
+```
+# Example transformations
+checkmate gen "Feature description" → checkmate gen "Feature description" --yes --non-interactive --answer y
+checkmate run → checkmate run --yes --non-interactive
+```
+
+This ensures that AI assistants can use CheckMate commands without getting stuck waiting for user input. 

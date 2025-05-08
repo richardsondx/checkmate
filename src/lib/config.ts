@@ -33,7 +33,7 @@ const DEFAULT_CONFIG: CheckMateConfig = {
     reason: 'claude-3-7-sonnet-20250219',
     quick: 'gpt-4o-mini',
   },
-  tree_cmd: "git ls-files | grep -E '\\\\.(ts|js|tsx|jsx)$'",
+  tree_cmd: "find . -type f \\( -name '*.ts' -o -name '*.js' -o -name '*.tsx' -o -name '*.jsx' \\) -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/build/*'",
   log: 'optional',
   context_top_n: 40,
   show_thinking: true,

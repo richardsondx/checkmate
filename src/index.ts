@@ -169,6 +169,11 @@ yargsInstance
         .option('interactive', {
           describe: 'Enable interactive mode for selection',
           type: 'boolean'
+        })
+        .option('analyze', {
+          describe: 'Analyze codebase to identify features directly',
+          type: 'boolean',
+          default: false
         });
     },
     async (argv: any) => {
@@ -180,7 +185,8 @@ yargsInstance
         interactive: argv.interactive,
         fail: argv.fail,
         pass: argv.pass,
-        stale: argv.stale
+        stale: argv.stale,
+        analyze: argv.analyze
       });
     }
   )
@@ -659,6 +665,12 @@ yargsInstance
           describe: 'Output in JSON format',
           type: 'boolean',
           default: false
+        })
+        .option('detailed', {
+          describe: 'Show detailed breakdown of each API request',
+          type: 'boolean',
+          default: false,
+          alias: 'd'
         });
     }, 
     async () => {
@@ -855,6 +867,11 @@ yargsInstance
           describe: 'Output in machine-readable format for Cursor integration',
           type: 'boolean',
           default: false
+        })
+        .option('rewrite', {
+          describe: 'Rewrite existing specs with consistent bullets',
+          type: 'boolean',
+          default: false
         });
     },
     async (argv: any) => {
@@ -973,6 +990,11 @@ yargsInstance
           type: 'boolean',
           default: false
         })
+        .option('auto-sync', {
+          describe: 'Automatically add missing bullets to spec',
+          type: 'boolean',
+          default: false
+        })
         .check((argv) => {
           // Ensure the positional argument gets assigned as spec when used
           if (argv._.length > 1 && argv._[1] && !argv.spec && !argv.s) {
@@ -994,7 +1016,8 @@ yargsInstance
         quiet: argv.quiet,
         debug: argv.debug,
         force: argv.force,
-        warnOnly: argv.warnOnly
+        warnOnly: argv.warnOnly,
+        autoSync: argv.autoSync
       });
     }
   )

@@ -13,12 +13,12 @@
     "test:coverage": "node tests/run-coverage.mjs",
     "test:all": "./scripts/test-coverage.sh",
     "build": "tsc",
-    "dev": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/index.ts",
-    "checkmate": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/index.ts",
-    "status": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/commands/status.ts",
+    "dev": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts",
+    "checkmate": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts",
+    "status": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/index.ts",
     "stats": "node dist/commands/stats.js",
-    "mcp": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/mcp/index.ts",
-    "setup-mcp": "NODE_OPTIONS=\"--loader ts-node/esm --no-warnings=DEP0040\" ts-node src/commands/setup-mcp.ts",
+    "mcp": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/mcp/index.ts",
+    "setup-mcp": "NODE_OPTIONS=\"--loader ts-node/esm\" ts-node src/commands/setup-mcp.ts",
     "prepare": "npm run build",
     "spec-snapshot": "node scripts/spec-snapshot.js create",
     "spec-verify": "node scripts/spec-snapshot.js verify",
@@ -61,6 +61,7 @@
     "ajv-formats": "^3.0.1",
     "axios": "^1.9.0",
     "better-sqlite3": "^11.9.1",
+    "chai": "^5.2.0",
     "cli-table3": "^0.6.5",
     "clipboardy": "^4.0.0",
     "diff": "^7.0.0",
@@ -69,8 +70,11 @@
     "fast-glob": "^3.3.3",
     "glob": "^11.0.2",
     "js-yaml": "^4.1.0",
+    "mocha": "^11.2.2",
     "openai": "^4.29.0",
     "ora": "^8.2.0",
+    "psl": "^1.9.0",
+    "punycode.js": "^2.3.1",
     "rehype-stringify": "^10.0.1",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
@@ -83,5 +87,8 @@
     "vfile": "^6.0.3",
     "vfile-reporter": "^8.1.1",
     "zod": "^3.24.3"
+  },
+  "overrides": {
+    "punycode": "npm:punycode.js@^2.3.1"
   }
 }

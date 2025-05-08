@@ -24,13 +24,13 @@ interface McpResponse {
 /**
  * Get features data for Cursor integration
  */
-export function getFeatures(options: {
+export async function getFeatures(options: {
   search?: string;
   type?: string;
   status?: string;
-} = {}): McpResponse {
+} = {}): Promise<McpResponse> {
   try {
-    const features = getFeaturesData(options);
+    const features = await getFeaturesData(options);
     
     return {
       success: true,
@@ -168,7 +168,7 @@ export async function routeEvent(event: any): Promise<McpResponse> {
       case 'features.list':
         // Handle features listing request
         console.log('📊 Getting features list');
-        result = getFeatures({
+        result = await getFeatures({
           search: event.search,
           type: event.type,
           status: event.status

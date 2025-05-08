@@ -3,6 +3,79 @@ description:
 globs:
 alwaysApply: false
 ---
-# CheckMate · Spec‑Format Linter
-- On file save in checkmate/specs/, validate format
-  - Execute: node scripts/validate-spec-format.js "$FILEPATH"
+# CheckMate · Spec Format Validator
+
+This rule ensures all CheckMate specification files follow the required format structure.
+
+```rule type=activation
+activationTrigger:
+  change:
+    include: ["checkmate/specs/**.md", "checkmate/specs/agents/**.yaml"]
+  maxRuns: 1
+```
+
+```rule type=on_change
+# Handle files differently based on extension
+if [[ "$FILEPATH" == *.md ]]; then
+  # Markdown spec validation
+  echo "🔍 Validating Markdown spec format: $FILEPATH"
+  node scripts/validate-spec-format.js "$FILEPATH"
+  
+  if [ $? -ne 0 ]; then
+    # Validation failed, offer to fix
+    echo "⚠️ Spec format validation failed for $FILEPATH"
+    echo "🔧 To automatically fix formatting issues run:"
+    echo "   node scripts/validate-spec-format.js \"$FILEPATH\" --fix"
+    exit 1
+  else
+    echo "✅ Spec format valid: $FILEPATH"
+  fi
+else
+  # YAML agent spec validation (future)
+  echo "🔍 YAML agent spec validation not yet implemented: $FILEPATH"
+  exit 0
+fi
+```
+
+## Required Format
+
+Every CheckMate specification file must include:
+
+1. **Title** - Starting with a single `#` heading
+2. **Description** - A `## Description` section explaining the feature
+3. **Checks** - A `## Checks` section with "verb + object" style bullets
+4. **Files** - A `## Files` section listing relevant files
+5. **Metadata** - A `<!-- meta: ... -->` section with files and file_hashes
+6. **Generation Note** - A note about how the spec was generated
+
+Example format:
+```md
+# Feature Title
+
+## Description
+Description of the feature.
+
+## Checks
+- [ ] validate user credentials
+- [ ] store user data
+- [ ] handle authentication errors
+
+## Files
+- src/auth.js
+- src/user.js
+
+<!-- meta:
+{
+  "files": [
+    "src/auth.js",
+    "src/user.js"
+  ],
+  "file_hashes": {
+    "src/auth.js": "hash1",
+    "src/user.js": "hash2"
+  }
+}
+-->
+
+<!-- generated via checkmate spec v0.5 -->
+```

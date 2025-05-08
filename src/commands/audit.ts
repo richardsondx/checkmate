@@ -13,11 +13,13 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { getSpecByName, parseSpec } from '../lib/specs.js';
 import { getFileContent, getRelevantFiles } from '../lib/files.js';
-import { aiSummarize } from '../lib/ai-client.js';
+import { extractActionBullets, compareBullets } from '../lib/bullet-x.js';
 import { saveWarmupPatterns } from '../lib/analyzer.js';
 import { testCommand } from './test.js';
 import { statusCommand } from './status.js';
 import * as readline from 'node:readline/promises';
+import { glob } from 'glob';
+import { getFeaturesData } from './features.js';
 
 // Directory where implementation outlines are stored (cache)
 const CACHE_DIR = 'checkmate/cache';
@@ -30,6 +32,7 @@ interface AuditCommandOptions {
   debug?: boolean;
   force?: boolean; // Force regeneration of bullet extraction
   warnOnly?: boolean; // Only warn on differences, don't fail
+  autoSync?: boolean; // Automatically sync missing bullets to spec
 }
 
 /**
@@ -57,47 +60,75 @@ export async function auditCommand(options: AuditCommandOptions = {}): Promise<a
   // Get the spec path based on name or path
   if (options.spec) {
     try {
-      const specPaths = await getSpecByName(options.spec);
+      // First, check if the spec name matches a known feature
+      const features = await getFeaturesData();
+      // Use a non-null assertion since we've already checked options.spec exists
+      const specName = options.spec;
+      const matchingFeature = features.find(feature => 
+        feature.slug === specName || 
+        feature.slug.includes(specName) || 
+        specName.includes(feature.slug)
+      );
       
-      if (!specPaths || specPaths.length === 0) {
-        // Try treating specName as a direct path
-        if (fs.existsSync(options.spec)) {
-          specPath = options.spec;
-        } else {
-          // Spec not found
-          if (!options.quiet) {
-            console.error(chalk.red(`❌ Could not find spec "${options.spec}"`));
-            console.log('Run "checkmate specs" to see a list of available specs.');
-          }
-          return { error: true, message: `Spec not found: ${options.spec}` };
-        }
-      } else if (specPaths.length === 1) {
-        // Exactly one match found
-        specPath = specPaths[0];
+      if (matchingFeature && matchingFeature.filePath && fs.existsSync(matchingFeature.filePath)) {
+        specPath = matchingFeature.filePath;
         if (!options.quiet) {
-          console.log(chalk.green(`✅ Found spec: ${path.basename(specPath)}`));
+          console.log(chalk.green(`✅ Found spec for feature: ${matchingFeature.title}`));
         }
       } else {
-        // Multiple matches found
-        if (!options.quiet) {
-          console.log(chalk.yellow(`Found ${specPaths.length} potential matches for "${options.spec}":`));
-          
-          // Show the matches with numbers
-          specPaths.forEach((specFilePath, index) => {
-            const basename = path.basename(specFilePath);
-            const relativePath = path.relative(process.cwd(), specFilePath);
-            console.log(`  ${index + 1}. ${chalk.cyan(basename)} (${relativePath})`);
-          });
-          
-          // Use first match by default
-          console.log(chalk.yellow(`\nUsing the first match: ${path.basename(specPaths[0])}`));
+        // Fall back to the traditional spec search if no matching feature found
+        const specPaths = await getSpecByName(options.spec);
+        
+        if (!specPaths || specPaths.length === 0) {
+          // Try treating specName as a direct path
+          if (fs.existsSync(options.spec)) {
+            specPath = options.spec;
+          } else if (fs.existsSync(`checkmate/specs/${options.spec}`)) {
+            // Try in the checkmate/specs directory
+            specPath = `checkmate/specs/${options.spec}`;
+          } else if (fs.existsSync(`checkmate/specs/${options.spec}.md`)) {
+            // Try with .md extension added
+            specPath = `checkmate/specs/${options.spec}.md`;
+          } else {
+            // Spec not found
+            if (!options.quiet) {
+              console.error(chalk.red(`❌ Could not find spec "${options.spec}"`));
+              console.log('Run "checkmate features" to see a list of available features.');
+            }
+            return { error: true, message: `Spec not found: ${options.spec}` };
+          }
+        } else if (specPaths.length === 1) {
+          // Exactly one match found
+          specPath = specPaths[0];
+          if (!options.quiet) {
+            console.log(chalk.green(`✅ Found spec: ${path.basename(specPath)}`));
+          }
+        } else {
+          // Multiple matches found
+          if (!options.quiet) {
+            console.log(chalk.yellow(`Found ${specPaths.length} potential matches for "${options.spec}":`));
+            
+            // Show the matches with numbers
+            specPaths.forEach((specFilePath, index) => {
+              const basename = path.basename(specFilePath);
+              const relativePath = path.relative(process.cwd(), specFilePath);
+              console.log(`  ${index + 1}. ${chalk.cyan(basename)} (${relativePath})`);
+            });
+            
+            // Use first match by default
+            console.log(chalk.yellow(`\nUsing the first match: ${path.basename(specPaths[0])}`));
+          }
+          specPath = specPaths[0];
         }
-        specPath = specPaths[0];
       }
       
       // Parse the spec
       try {
-        specData = parseSpec(specPath as string);
+        if (specPath) {
+          specData = parseSpec(specPath);
+        } else {
+          throw new Error(`No spec path found for ${options.spec || 'unknown'}`);
+        }
       } catch (error) {
         if (!options.quiet) {
           console.error(chalk.red(`❌ Error parsing spec: ${(error as Error).message}`));
@@ -176,10 +207,56 @@ export async function auditCommand(options: AuditCommandOptions = {}): Promise<a
   if (shouldGenerateBullets) {
     if (options.files && options.files.length > 0) {
       // Use explicitly provided files
-      filesToAnalyze = options.files;
+      filesToAnalyze = options.files.flatMap(f => f.split(','));
+      
+      // Directly check for file existence and provide detailed output
+      const validatedFiles: string[] = [];
+      for (const filePath of filesToAnalyze) {
+        try {
+          // Check if it's a direct file path
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            validatedFiles.push(filePath);
+          } else {
+            // Try different variations
+            const possibilities = [
+              filePath,
+              path.resolve(filePath),
+              path.join(process.cwd(), filePath)
+            ];
+            
+            let found = false;
+            for (const possiblePath of possibilities) {
+              if (fs.existsSync(possiblePath) && fs.statSync(possiblePath).isFile()) {
+                validatedFiles.push(possiblePath);
+                found = true;
+                break;
+              }
+            }
+            
+            if (!found && !options.quiet) {
+              console.warn(chalk.yellow(`⚠️ Could not find file: ${filePath}`));
+            }
+          }
+        } catch (error) {
+          if (!options.quiet) {
+            console.warn(chalk.yellow(`⚠️ Error processing file path ${filePath}: ${(error as Error).message}`));
+          }
+        }
+      }
+      
+      // Update to use validated files
+      filesToAnalyze = validatedFiles.length > 0 ? validatedFiles : filesToAnalyze;
+      
+      if (!options.quiet) {
+        console.log(chalk.blue(`🔍 Using ${filesToAnalyze.length} files from command line args`));
+      }
     } else if (specData.files && specData.files.length > 0) {
       // Use files from the spec
       filesToAnalyze = specData.files;
+      
+      if (!options.quiet) {
+        console.log(chalk.blue(`🔍 Using ${filesToAnalyze.length} files from spec`));
+      }
     } else {
       // No files specified, use embedding to find relevant files
       if (!options.quiet) {
@@ -223,30 +300,53 @@ export async function auditCommand(options: AuditCommandOptions = {}): Promise<a
       }
     }
     
-    // Generate the implementation bullets
+    // Generate the implementation bullets using the shared bullet-x module
     if (!options.quiet) {
       console.log(chalk.blue('🔄 Extracting action bullets from implementation...'));
     }
     
-    implBullets = await extractImplementationBullets(fileContents);
-    
-    // Save the bullets to cache
-    fs.writeFileSync(cacheFilePath, JSON.stringify({ 
-      specName,
-      timestamp: new Date().toISOString(),
-      bullets: implBullets
-    }, null, 2), 'utf8');
-    
-    // Update the warmup patterns cache with implementation bullets
-    saveWarmupPatterns(slug, implBullets);
-    
-    if (!options.quiet) {
-      console.log(chalk.green(`✅ Implementation bullets cached to ${cacheFilePath}`));
+    try {
+      implBullets = await extractActionBullets(fileContents);
+      
+      // Save the bullets to cache
+      fs.writeFileSync(cacheFilePath, JSON.stringify({ 
+        specName,
+        timestamp: new Date().toISOString(),
+        bullets: implBullets
+      }, null, 2), 'utf8');
+      
+      // Update the warmup patterns cache with implementation bullets
+      saveWarmupPatterns(slug, implBullets);
+      
+      if (!options.quiet) {
+        console.log(chalk.green(`✅ Implementation bullets cached to ${cacheFilePath}`));
+      }
+    } catch (error) {
+      if (!options.quiet) {
+        console.error(chalk.red(`❌ Error extracting action bullets: ${(error as Error).message}`));
+      }
+      
+      // Fall back to cached bullets if they exist
+      if (fs.existsSync(cacheFilePath)) {
+        try {
+          const cachedData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
+          implBullets = cachedData.bullets || [];
+          
+          if (!options.quiet) {
+            console.log(chalk.yellow(`⚠️ Falling back to cached implementation bullets due to extraction error.`));
+          }
+        } catch (cacheError) {
+          // If can't read cache, return error
+          return { error: true, message: `Error extracting action bullets and no valid cache found.` };
+        }
+      } else {
+        return { error: true, message: `Error extracting action bullets: ${(error as Error).message}` };
+      }
     }
   }
   
-  // Compare spec bullets with implementation bullets
-  const diffResult = compareActionBullets(specBullets, implBullets);
+  // Compare spec bullets with implementation bullets using the shared bullet-x module
+  const diffResult = compareBullets(specBullets, implBullets);
   
   // Format the results
   if (options.json) {
@@ -291,9 +391,16 @@ export async function auditCommand(options: AuditCommandOptions = {}): Promise<a
       }
     }
     
-    // Interactively prompt to add missing bullets to spec
+    // Interactively prompt to add missing bullets to spec or do it automatically
     if (diffResult.missingInSpec.length > 0) {
-      await promptToAddToSpec(diffResult.missingInSpec, specPath as string);
+      if (options.autoSync) {
+        await addBulletsToSpec(diffResult.missingInSpec, specPath as string);
+        if (!options.quiet) {
+          console.log(chalk.green(`✅ Auto-added ${diffResult.missingInSpec.length} bullets to spec`));
+        }
+      } else {
+        await promptToAddToSpec(diffResult.missingInSpec, specPath as string);
+      }
     }
     
     // If there are missing items, fail unless warn-only mode is enabled
@@ -358,105 +465,44 @@ function extractSpecActionBullets(specData: any): string[] {
 }
 
 /**
- * Extract action bullets from implementation file contents
+ * Automatically add bullets to a spec without prompting
  */
-async function extractImplementationBullets(fileContents: Record<string, string>): Promise<string[]> {
-  // Combine file contents into a single prompt
-  const fileText = Object.entries(fileContents)
-    .map(([file, content]) => `// File: ${file}\n${content}`)
-    .join('\n\n');
+async function addBulletsToSpec(bullets: string[], specPath: string): Promise<boolean> {
+  // Read the original spec content
+  const specContent = fs.readFileSync(specPath, 'utf8');
   
-  // Define stoplist for common verbs to filter out
-  const stopVerbs = ['return', 'print', 'log', 'console'];
-  
-  // Create the prompt for the AI using the new "Action Bullet" schema
-  const prompt = `
-Extract the key actions performed by this code as a list of imperative action bullets.
-Each bullet must follow the format: "verb + object" (e.g., "validate credentials", "hash password").
-
-Guidelines:
-- Use simple present tense imperative verbs (e.g., "create", "fetch", "validate")
-- Each bullet must be a single action (do not combine multiple actions)
-- Do NOT number the bullets, use plain dash (-) format
-- Focus on functional behavior, not implementation details
-- Filter out trivial actions like ${stopVerbs.join(', ')} unless they're primary functionality
-- DO NOT use sub-bullets or nested lists
-
-Example of good action bullets:
-- validate user credentials
-- fetch user profile
-- create authentication token
-- update database record
-
-Return ONLY the bullet list with no introduction, description, explanation, or numbers.
-
-Files to analyze:
-${fileText}
-`;
-
-  // Call the AI to generate the bullets
-  const response = await aiSummarize(prompt);
-  
-  // Extract just the bullet points (lines starting with -)
-  const bullets = response.split('\n')
-    .map(line => line.trim())
-    .filter(line => line.startsWith('- '))
-    .map(line => line.substring(2).trim())  // Remove the bullet marker
-    .filter(line => line.length > 0 && !stopVerbs.some(verb => line.startsWith(verb)));
-  
-  return bullets;
-}
-
-/**
- * Compare action bullets between spec and implementation
- */
-function compareActionBullets(specBullets: string[], implBullets: string[]): {
-  matches: string[];
-  missingInCode: string[];
-  missingInSpec: string[];
-} {
-  // Use sets to store the results
-  const matches: string[] = [];
-  const missingInCode: string[] = [];
-  const missingInSpec: string[] = [];
-  
-  // Normalize bullets for comparison
-  const normalizeText = (text: string): string => {
-    return text.toLowerCase()
-      .replace(/\s+/g, ' ')  // Normalize whitespace
-      .replace(/[.,;:!?]$/g, '')  // Remove trailing punctuation
-      .trim();
-  };
-  
-  // Create normalized sets for efficient lookups
-  const normalizedSpecBullets = new Map<string, string>();
-  const normalizedImplBullets = new Map<string, string>();
-  
-  specBullets.forEach(bullet => {
-    normalizedSpecBullets.set(normalizeText(bullet), bullet);
-  });
-  
-  implBullets.forEach(bullet => {
-    normalizedImplBullets.set(normalizeText(bullet), bullet);
-  });
-  
-  // Find matches
-  for (const [normalized, original] of normalizedSpecBullets.entries()) {
-    if (normalizedImplBullets.has(normalized)) {
-      matches.push(original);
-    } else {
-      missingInCode.push(original);
-    }
+  // Find the Checks section
+  const checksIndex = specContent.indexOf('## Checks');
+  if (checksIndex === -1) {
+    console.error(chalk.red('❌ Could not find "## Checks" section in spec'));
+    return false;
   }
   
-  // Find missing in spec
-  for (const [normalized, original] of normalizedImplBullets.entries()) {
-    if (!normalizedSpecBullets.has(normalized)) {
-      missingInSpec.push(original);
-    }
+  // Find the end of the Checks section
+  const nextSectionMatch = specContent.substring(checksIndex).match(/\n##\s/);
+  const endOfChecksIndex = nextSectionMatch && nextSectionMatch.index !== undefined
+    ? checksIndex + nextSectionMatch.index 
+    : specContent.length;
+  
+  // Extract the checks section
+  const checksSection = specContent.substring(checksIndex, endOfChecksIndex);
+  
+  // Add the new bullets at the end of the checks section
+  let newChecksSection = checksSection;
+  for (const bullet of bullets) {
+    newChecksSection += `\n- [ ] ${bullet}`;
   }
   
-  return { matches, missingInCode, missingInSpec };
+  // Construct the new content
+  const newContent = 
+    specContent.substring(0, checksIndex) + 
+    newChecksSection + 
+    specContent.substring(endOfChecksIndex);
+  
+  // Write the updated spec
+  fs.writeFileSync(specPath, newContent, 'utf8');
+  
+  return true;
 }
 
 /**
@@ -484,28 +530,8 @@ async function promptToAddToSpec(missingBullets: string[], specPath: string): Pr
         const checksIndex = specContent.indexOf('## Checks');
         
         if (checksIndex !== -1) {
-          // Add the new bullet to the spec
-          // We need to find the end of the Checks section
-          const nextSectionMatch = specContent.substring(checksIndex).match(/\n##\s/);
-          const endOfChecksIndex = nextSectionMatch && nextSectionMatch.index !== undefined
-            ? checksIndex + nextSectionMatch.index 
-            : specContent.length;
-          
-          // Extract the checks section
-          const checksSection = specContent.substring(checksIndex, endOfChecksIndex);
-          
-          // Add the new bullet at the end of the checks section
-          const newChecksSection = checksSection + `\n- [ ] ${bullet}`;
-          
-          // Construct the new content
-          const newContent = 
-            specContent.substring(0, checksIndex) + 
-            newChecksSection + 
-            specContent.substring(endOfChecksIndex);
-          
-          // Write the updated spec
-          fs.writeFileSync(specPath, newContent, 'utf8');
-          
+          // Add the new bullet to the spec using the shared function
+          await addBulletsToSpec([bullet], specPath);
           console.log(chalk.green(`✅ Added "${bullet}" to spec`));
         } else {
           console.error(chalk.red('❌ Could not find "## Checks" section in spec'));
@@ -530,7 +556,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     quiet: process.argv.includes('--quiet'),
     debug: process.argv.includes('--debug'),
     force: process.argv.includes('--force'),
-    warnOnly: process.argv.includes('--warn-only')
+    warnOnly: process.argv.includes('--warn-only'),
+    autoSync: process.argv.includes('--auto-sync')
   };
   
   await auditCommand(options);

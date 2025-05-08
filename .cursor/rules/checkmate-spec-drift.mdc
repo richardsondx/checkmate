@@ -6,3 +6,60 @@ alwaysApply: false
 # CheckMate · Spec‑vs‑Code Drift Audit
 - After each commit, audit changed specs
   - Execute: checkmate audit --target "$CM_LIST" --quiet --audit
+
+# Spec-Drift Rule
+
+<!-- 
+This Cursor rule checks for drift between specifications and implementation
+after commits by running the audit command with the `--auto-sync` flag.
+-->
+
+> Ensures that CheckMate specifications stay in sync with the code
+
+```rule type=activation
+activationTrigger:
+  event: post_commit
+  maxRuns: 1
+  timeout: 5min
+```
+
+```rule type=on_activation
+# Find modified files in the commit
+files=$(git diff-tree --no-commit-id --name-only -r HEAD)
+
+# Extract only source files to check
+source_files=$(echo "$files" | grep -E '\.(ts|js|tsx|jsx)$')
+
+if [ -n "$source_files" ]; then
+  echo "📊 CheckMate: Checking for spec drift in modified files..."
+  
+  # Run checkmate audit with auto-sync on affected specs
+  node ./dist/index.js affected --json | jq -r '.affected[]' | xargs -I {} node ./dist/index.js audit --spec {} --auto-sync --warn-only
+  
+  # Check if we need to notify about drift
+  if [ $? -ne 0 ]; then
+    echo "⚠️ Some specifications have drifted from implementation."
+    echo "CheckMate has attempted to auto-sync them, but please verify changes."
+  else
+    echo "✅ All specifications are in sync with implementation."
+  fi
+fi
+```
+
+## How this rule helps
+
+This rule automatically runs after every commit to:
+
+1. Identify which specs are affected by the changes
+2. Run `checkmate audit` on those specs with `--auto-sync` enabled
+3. Update specs with missing implementation bullets
+
+This keeps specifications in sync with your code as it evolves, reducing false warnings and ensuring consistency between the warmup and audit processes.
+
+If you commit changes that add new functionality or remove existing functionality, the rule will identify the drift and update the specs accordingly.
+
+To manually check for spec drift, run:
+
+```bash
+npx checkmate affected | xargs -I {} npx checkmate audit --spec {} --auto-sync
+```

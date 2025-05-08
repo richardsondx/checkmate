@@ -1,7 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: false
----
-# CheckMate – Full Suite on Push
-- Execute: node scripts/cm-enforce.js run
