@@ -2,7 +2,7 @@
 
 AI-powered specs verification that block bad code, see through hallucination, and prevent AI from breaking your code.
 
-CheckMate is an AI Test Driven Development tool that challenges AI’s overconfidence with a  logical reasoning verification process using LLM.
+CheckMate is an AI Test Driven Development tool that challenges AI's overconfidence with a logical reasoning verification process using LLM.
 
 It's built with Cursor AI in mind.
 
@@ -22,67 +22,115 @@ It's built with Cursor AI in mind.
 
 ## Quick Start
 
-```bash
-# Install
-npm install checkmateai
+1. **Install CheckMate:**
+   ```bash
+   npm install @checkmate/cli
+   ```
 
-# Initialize
-npx checkmate init
+2. **Initialize with sample spec:**
+   ```bash
+   npx checkmate init
+   ```
 
-# Scan your repository and generate initial specs (optional)
-checkmate warmup
+3. **Create specs from existing requirements**
+   If you have an existing PRD or requirements document:
+   ```bash
+   npx checkmate warmup docs/requirements.md
+   ```
+   
+   Or create a spec for a new feature:
+   ```bash
+   npx checkmate gen "Feature that allows users to reset their password"
+   ```
 
-# Create a spec for a new feature
-checkmate gen "User can reset their password via email link"
-```
+4. **Start building with Cursor AI:**
+   
+   Just tell Cursor:
+   ```
+   "Let's use CheckMate to build the password reset feature"
+   ```
+
+5. **Let the AI-driven TDD flow guide development:**
+   
+   - Cursor will analyze each requirement
+   - For each one, it will implement code and provide evidence
+   - CheckMate verifies the reasoning is sound
+   - You get feature implementation with built-in validation
+
+6. **Check status at any time:**
+   ```bash
+   npx checkmate status user-password-reset
+   ```
+
+For more details, see the [Command Reference](#command-reference) below.
 
 ### Using with Cursor AI
 
-1. **Start TDD for a feature:**
-   In Cursor, type: 
+When working with Cursor AI, you can use natural language to interact with CheckMate:
+
+1. **Start the TDD process for a feature:**
+   
+   Just tell Cursor:
    ```
-   /@checkmate-tdd user-password-reset
+   "Let's use CheckMate to build the password reset feature"
    ```
 
-2. **CheckMate provides check items to Cursor:**
-   - CheckMate lists all requirements from the spec
-   - Cursor receives instructions for validating each check item
+2. **What happens next:**
+   
+   CheckMate will show Cursor what needs to be implemented:
+   
+   "I need to verify these requirements for the password reset feature:
+   
+   1. System generates a unique, single-use token
+   2. User receives an email with the reset link
+   3. Clicking the link lets them set a new password
+   4. The token is invalidated after use"
 
-3. **Cursor works through each check:**
-   - Defines success/failure conditions for each check
-   - Implements or verifies code for each requirement
-   - Reports findings and calls verify-llm-reasoning
+3. **Cursor works through each requirement:**
+   
+   For each requirement, Cursor will:
+   - Think about what success and failure look like
+   - Write or check code to meet the requirement
+   - Show you the evidence it found
+   - Ask CheckMate to verify its reasoning
 
-4. **See the status of a spec:**
+4. **You can check progress anytime:**
+   
+   Ask Cursor:
+   ```
+   "What's the status of the password reset feature?"
+   ```
+   
+   Or run directly:
    ```bash
    checkmate status user-password-reset
    ```
 
-   Output:
-   ```
-   Spec Status: User Password Reset
-   ✅ System generates a unique, single-use password reset token
-   ✅ User receives an email with a link containing the reset token
-   ✅ Clicking the link allows the user to set a new password
-   ✅ The reset token is invalidated after use or expiration
-   ```
-
-This LLM-driven TDD loop ensures systematic implementation of requirements with logical validation.
+This conversational TDD workflow ensures Cursor systematically addresses each requirement with logical validation.
 
 ---
 
 ## Common Workflows
 
-### Cursor Integration Commands (Use inside Cursor AI)
-| Want to...? | Tell Cursor this |
-|-------------|------------------|
-| **Start TDD for a new/existing feature** | `/@checkmate-tdd <feature-slug>` or `/checkmate-tdd <feature-slug>` |
-| **Run CheckMate against open code** | `/runCheckmate` or `/run-checkmate` |
-| **Get help for a failing requirement** | `/fix-checkmate` |
+### Talking to Cursor AI
+| What you want | What to say to Cursor |
+|---------------|----------------------|
+| **Start TDD for a feature** | "Let's build the password reset feature with CheckMate" |
+| **Check existing code against specs** | "Does this code pass all CheckMate specs?" |
+| **Get help with a failing requirement** | "Why is this requirement failing in CheckMate?" |
+| **Create a spec for a new feature** | "Create a CheckMate spec for a login rate limiter" |
+| **See which specs are affected by my changes** | "What CheckMate specs are affected by these changes?" |
+| **Verify a feature meets its requirements** | "Can you verify the user authentication feature meets all CheckMate requirements?" |
+| **Run specific specs for a feature** | "Test the password reset feature against its CheckMate specs" |
+| **Fix a bug without breaking requirements** | "Fix this bug in the login feature while ensuring all CheckMate specs still pass" |
+| **Create specs for existing code** | "Create CheckMate specs for this existing user profile code" |
+| **Make an enhancement safely** | "Add email notifications to the account feature but make sure all existing CheckMate specs still pass" |
+| **Get help understanding specs** | "Explain what the third requirement in the authentication spec means" |
+| **Review code against specs** | "Does this pull request satisfy all the CheckMate specs for account management?" |
 
-### CLI Commands (Run in terminal)
-| Want to...? | Run this command |
-|-------------|------------------|
+### Using CLI Commands
+| What you want | Command to run |
+|---------------|----------------|
 | **Add a spec for existing code** | `checkmate gen "Description of existing feature"` |
 | **Generate specs from a PRD** | `checkmate warmup docs/PRD.md` |
 | **View all tracked features** | `checkmate features` |

@@ -92,7 +92,7 @@ CheckMate initialized!
 - Config file created at .checkmate
 - ${cursorConfigMessage}
 - ${cursorRulesMessage}
-- Added checkmate/* to .gitignore
+- Added checkmate/, .checkmate, and .checkmate-telemetry/ to .gitignore
 - Created directory structure for specs
 
 Your specs will live in checkmate/specs/
@@ -106,7 +106,8 @@ function updateGitignore(): void {
   const gitignorePath = '.gitignore';
   const entriesToAdd = [
     'checkmate/',
-    '.checkmate'
+    '.checkmate',
+    '.checkmate-telemetry/'
   ];
   
   let content = '';

@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# CheckMate · Spec Naming Convention
+
+This rule ensures that all spec files in the checkmate/specs directory follow proper naming conventions:
+- Slugified from feature titles
+- All lowercase
+- Hyphens instead of spaces
+- No numbers at beginning (unless part of feature name)
+- No special characters
+
+```rule type=activation
+activationTrigger:
+  change:
+    include: ["checkmate/specs/**.md"]
+  maxRuns: 1
+```
+
+```rule type=on_change
+# Check if the filename follows proper naming conventions
+FILENAME=$(basename "$FILEPATH" .md)
+
+# Check if the filename starts with a number followed by a dash
+if [[ $FILENAME =~ ^[0-9]+- ]]; then
+  echo "⚠️ Warning: Spec filename should be derived from feature title, not document section numbers."
+  echo "   Use 'user-login.md' instead of '1-user-login.md'"
+fi
+
+# Check if the filename is properly slugified (lowercase, hyphens, no special chars)
+if [[ ! $FILENAME =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  echo "⚠️ Warning: Spec filename should be properly slugified:"
+  echo "   - Use lowercase letters"
+  echo "   - Use hyphens instead of spaces"
+  echo "   - No special characters"
+  echo "   Example: 'user-login.md' not 'User Login.md'"
+fi
+
+# Check the first line of the file to ensure it starts with a proper heading
+if ! head -n 1 "$FILEPATH" | grep -q "^# "; then
+  echo "⚠️ Warning: Spec file should start with a level 1 heading (# Feature Title)"
+fi
+
+# Check that a "## Checks" section exists
+if ! grep -q "^## Checks" "$FILEPATH"; then
+  echo "⚠️ Warning: Spec file must contain a '## Checks' section with acceptance criteria"
+fi
