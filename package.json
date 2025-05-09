@@ -1,11 +1,13 @@
-
 {
   "name": "checkmateai",
   "version": "0.1.0",
   "description": "AI-powered specs verification that block bad code, challenges AI's overconfidence, and prevent AI from breaking your code",
   "main": "dist/index.js",
   "type": "module",
-  "bin": "dist/index.js",
+  "bin": {
+    "checkmateai": "dist/index.js",
+    "checkmate": "dist/index.js"
+  },
   "scripts": {
     "test": "node tests/unit/commands/test-gen.mjs",
     "test:coverage": "node tests/run-coverage.mjs",
@@ -39,17 +41,13 @@
     "@types/js-yaml": "^4.0.9",
     "@types/string-similarity": "^4.0.2",
     "@types/yargs": "^17.0.33",
-    "boxen": "^8.0.1",
-    "chalk": "^5.4.1",
     "chokidar": "^4.0.3",
     "execa": "^9.5.2",
     "inquirer": "^12.6.0",
     "simple-git": "^3.27.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3",
-    "yaml": "^2.7.1",
-    "yargs": "^17.7.2"
+    "typescript": "^5.8.3"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.1",
@@ -87,7 +85,11 @@
     "uuid": "^11.1.0",
     "vfile": "^6.0.3",
     "vfile-reporter": "^8.1.1",
-    "zod": "^3.24.3"
+    "zod": "^3.24.3",
+    "boxen": "^8.0.1",
+    "chalk": "^5.4.1",
+    "yaml": "^2.7.1",
+    "yargs": "^17.7.2"
   },
   "overrides": {
     "punycode": "npm:punycode.js@^2.3.1"

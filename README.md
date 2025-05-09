@@ -18,10 +18,70 @@ CheckMate works best with both API keys:
 - **OpenAI API Key**: Required for GPT models (default `quick` verifier)
 - **Anthropic API Key**: Required for Claude models (default `reason` generator)
 
+## Quick Setup
+
+```bash
+# Install globally
+npm install -g checkmateai
+
+# Initialize in your project
+npx checkmateai init
+```
+
+That's it! `checkmate init` takes care of everything - creating directories, config files, and setting up Cursor integration.
+
+After initialization, add your API keys to the auto-generated `.checkmate` file:
+
+```yaml
+openai_key: sk-****      # Your OpenAI API key 
+anthropic_key: sk-ant-**** # Your Anthropic API key
+```
+
+For detailed explanations of what happens during initialization or for manual setup instructions, see the [Initialization Process](wiki/Initialization-Process.md) guide.
+
+## MCP Integration
+
+CheckMate can be set up as a Middleware Control Protocol (MCP) server for deep Cursor AI integration, enabling a seamless TDD experience directly in your editor:
+
+```bash
+# Set up the MCP integration automatically
+npx checkmate setup-mcp
+```
+
+This creates or updates your `.cursor/config.json` file with the necessary MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "checkmate": {
+      "command": "node",
+      "args": [
+        "dist/mcp/index.js"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+The MCP server automatically reads configuration values (including API keys and model preferences) directly from your `.checkmate` file, eliminating redundant configuration and potential inconsistencies.
+
+With MCP integration:
+- Simply describe what you want to build in Cursor ("Build a login form")
+- CheckMate automatically generates specs and runs checks
+- Cursor implements the code against the generated requirements
+- Checks are verified to ensure the implementation matches the specification
+
+For detailed MCP configuration options, see the [Cursor Integration Guide](wiki/Cursor-Integration.md).
+
+## Configuration
+
+CheckMate uses your local `.checkmate` file for configuration. This file is never committed to version control (it's automatically added to `.gitignore`).
+
 While you can run with just one key, the recommended configuration uses both:
 
 ```yaml
-# In .checkmate file (automatically added to .gitignore)
+# In .checkmate file
 openai_key: sk-****      # Your OpenAI API key 
 anthropic_key: sk-ant-**** # Your Anthropic API key
 ```
@@ -35,7 +95,7 @@ This dual-model approach ensures:
 2. Faster verification cycles (GPT models are typically quicker)
 3. Cost optimization (using the right model for each task)
 
-Additional configuration options include:
+### Additional Configuration Options
 
 ```yaml
 # Model selection
@@ -57,6 +117,18 @@ auto_fix:
 
 For full configuration details, see the [Configuration Guide](wiki/Configuration-Guide.md).
 
+### Environment Variables
+
+Instead of storing API keys in the `.checkmate` file, you can use environment variables:
+
+```bash
+# Add to your .env file or set in your shell
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+CheckMate will automatically detect and use these environment variables if present.
+
 ### AI Integration and Token Usage
 
 CheckMate supports both User Specs (Markdown) and Agent Specs (YAML) that work together to validate your code. Learn more about when to use each in the [Spec Types Guide](wiki/Spec-Types.md).
@@ -68,7 +140,7 @@ CheckMate strategically uses AI for specific operations to balance quality and c
 | Operation | Model Used | Token Usage | When It Happens |
 |-----------|------------|-------------|-----------------|
 | **Spec Generation** | `reason` (claude-3-sonnet) | High | Only when you run `gen`, `draft`, or `warmup` commands |
-| **Requirement Verification** | `quick` (gpt-4o-mini) | Medium | During `run` and `verify` operations |
+| **Requirement Verification** | `quick` (gpt-4o-mini) | Medium | During `status` and `verify` operations |
 | **Clarification** | `reason` (claude-3-sonnet) | Medium-High | Only when explicitly using `clarify` command |
 
 #### Cost Optimization Features
@@ -100,7 +172,7 @@ checkmate model set reason claude-3-haiku
 | `checkmate gen -i "<sentence>"` | Interactive spec generation with approval workflow. |
 | `checkmate draft "<sentence>"` | Generate spec drafts as JSON without writing to disk. |
 | `checkmate save --json '<json>'` | Save approved spec drafts to disk. |
-| `checkmate run` | Run every check, flip boxes, exit 1 on fail. |
+| `checkmate status --target <spec>` | Check spec status, report passes/failures. |
 | `checkmate next` | Run the first unchecked step in the current branch. |
 | `checkmate affected` | Print spec names touched by the current diff. |
 | `checkmate clarify <slug>` | Explain why a requirement is failing and suggest fixes. |
@@ -117,8 +189,8 @@ checkmate model set reason claude-3-haiku
 Need to...? | Try this:
 ------------|----------
 **Create a specification** | `checkmate gen "User can reset their password"`
-**Run all checks** | `checkmate run`
-**Focus on a specific spec** | `checkmate run --target user-password-reset`
+**Check spec status** | `checkmate status --target user-password-reset`
+**Focus on a specific spec** | `checkmate status --target user-password-reset`
 **Monitor progress** | `checkmate watch` (in a separate terminal)
 **Watch a specific feature** | `checkmate watch --spec user-auth --until-pass`
 **Fix failing specs first** | `checkmate watch --status FAIL`

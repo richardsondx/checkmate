@@ -11,20 +11,21 @@ checkmate gen "A user can add a new todo with title and status"
 # let Cursor (or you) build the code
 # …
 
-# run the checklist
-checkmate run
+# check the spec status
+checkmate status --target add-todo
 ```
 
 CLI output:
 
 ```
-Feature: add-todo
-  ✔ Reject blank titles
-  ✔ Insert row with done:false
-  ✖ Return 201 JSON payload
+Spec Status: add-todo
+✔ 2 / 3 requirements passed (66%)
+
+Failing requirements:
+1. Return 201 JSON payload
 ```
 
-Fix the red line, run again, get all green.  
+Fix the red line, run the status check again, get all green.  
 CheckMate resets the boxes, logs the pass, and you move on.
 
 ## When You Clone a Repo Using CheckMate
@@ -53,15 +54,15 @@ CheckMate resets the boxes, logs the pass, and you move on.
 4. **Smoke‑test the specs**
 
    ```bash
-   checkmate run
+   checkmate status
    ```
 
-   You should see every box turn green. If something fails, the spec shows exactly what broke.
+   You should see every spec status reported. If something fails, the spec shows exactly what broke.
 
 5. **Start coding**
 
-   Make a change, commit, and watch the Cursor rules kick off `checkmate affected` → `checkmate run`.
-   Any red box stops the "Done" badge until you push a fix.
+   Make a change, commit, and watch the Cursor rules kick off `checkmate affected` → `checkmate status`.
+   Any failures stop the "Done" badge until you push a fix.
 
 That's all—no extra setup, no hidden steps. You clone, install, add your key, and the watchdog is live.
 
@@ -69,7 +70,7 @@ That's all—no extra setup, no hidden steps. You clone, install, add your key, 
 
 1. Run the `init` script.  
 2. Describe your first feature with `checkmate gen "…"`.  
-3. Build until the list shows √ for every line.  
+3. Build until the status shows all requirements are passing.  
 4. Repeat for each new feature.
 
 No existing paths, so the generator guesses file names (e.g. `src/routes/todos.ts`).  
@@ -82,7 +83,7 @@ When the code appears, future scans catch the real paths.
 
    ```bash
    checkmate gen "List all todos"
-   checkmate run   # everything should pass
+   checkmate status --target list-all-todos  # everything should pass
    ```
 
 3. Add more specs until you feel covered.  
@@ -100,10 +101,10 @@ The `warmup` command is perfect for adding CheckMate to existing projects:
 checkmate warmup
 ```
 
-Approve or edit the suggestions, then run:
+Approve or edit the suggestions, then check each spec:
 
 ```bash
-checkmate run    # green = baseline locked in
+checkmate status    # check baseline status for all specs
 ```
 
 Now every Cursor task auto‑checks itself against those specs—no extra commands.
