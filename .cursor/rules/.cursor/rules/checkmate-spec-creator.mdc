@@ -1,5 +1,5 @@
 ---
-description: Facilitates creation of CheckMate specification files from natural language descriptions. Use when asked to create specs for new features.
+description: "Facilitates creation of CheckMate specification files from natural language descriptions. Use when asked to create specs for new features."
 type: "Agent Requested"
 globs: 
 alwaysApply: false

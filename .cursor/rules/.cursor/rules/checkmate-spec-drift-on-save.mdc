@@ -1,5 +1,6 @@
 ---
-description: Monitors and reports on spec drift when files are saved. Use to maintain alignment between implementation and specifications automatically.
+description: "Monitors and reports on spec drift when files are saved. Use to maintain alignment between implementation and specifications automatically."
+type: "Agent Requested"
 globs: 
 alwaysApply: false
 ---

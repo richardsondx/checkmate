@@ -1,0 +1,8 @@
+---
+description: "Runs after each push to verify all specs are passing against the latest codebase."
+type: "Agent Requested"
+globs: 
+alwaysApply: false
+---
+# CheckMate – Full Suite on Push
+- Execute: node scripts/cm-enforce.js run

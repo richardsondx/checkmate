@@ -1,8 +1,9 @@
-/*
-# CheckMate Feature Validation Workflow
-
-This rule enforces a standard workflow when asked to use CheckMate to validate that a feature is working correctly.
-*/
+---
+description: "Provides a structured workflow for validating features using CheckMate. Use when needing to validate a feature's implementation against its specifications."
+type: "Agent Requested"
+globs: 
+alwaysApply: false
+---
 /*
 # CheckMate Feature Validation Workflow
 

@@ -339,11 +339,17 @@ function parseMarkdownSpec(content: string): {
     const lines = section[1].split('\n');
     
     for (const line of lines) {
-      // Look for checkbox format: - [ ] or - [x]
-      const checkMatch = line.match(/- \[([ xX])\] (.*?)(?=\n|$)/);
+      // Look for checkbox format: - [ ], - [x], - [🟩], or - [🟥]
+      const checkMatch = line.match(/- \[(x|X| |🟩|🟥)\] (.*?)(?=\n|$)/);
       
       if (checkMatch) {
-        const status = checkMatch[1].toLowerCase() === 'x';
+        const charInsideBrackets = checkMatch[1];
+        let status = false;
+        if (charInsideBrackets.toLowerCase() === 'x' || charInsideBrackets === '🟩') {
+          status = true;
+        }
+        // [🟥] and [ ] will result in status = false
+        
         const text = checkMatch[2].trim();
         
         // Create a check with an ID

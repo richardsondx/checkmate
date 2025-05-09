@@ -58,35 +58,63 @@ export async function addMetaToSpec(specPath: string, enableAutoFiles: boolean =
       }
     }
     
-    // Create meta block
-    const meta: FileMeta = {
-      files_auto: enableAutoFiles,
-      file_hashes: fileHashes
-    };
-    
     // Check if file is markdown or yaml
     if (specPath.endsWith('.md')) {
-      // For markdown file, add as HTML comment at the end
-      const metaYaml = yaml.stringify({ meta });
-      const metaComment = `\n\n<!-- meta:\n${metaYaml}-->\n`;
-      
-      // Check if meta block already exists
-      if (content.includes('<!-- meta:')) {
-        // Replace existing meta block
-        const newContent = content.replace(/<!-- meta:[\s\S]*?-->/, metaComment);
-        fs.writeFileSync(specPath, newContent, 'utf8');
-      } else {
-        // Add meta block at the end
-        fs.writeFileSync(specPath, content + metaComment, 'utf8');
+      // Check if the Files section already exists
+      if (!/^## Files/m.test(content)) {
+        // Extract files from content as well
+        const filePaths = Object.keys(fileHashes);
+        
+        // We need to add a Files section after the Checks section
+        const checksIndex = content.indexOf('## Checks');
+        if (checksIndex !== -1) {
+          // Find the next section after Checks
+          const nextSectionMatch = content.slice(checksIndex + 9).match(/^##\s/m);
+          const insertPosition = nextSectionMatch && nextSectionMatch.index !== undefined
+            ? checksIndex + 9 + nextSectionMatch.index 
+            : content.length;
+          
+          // Generate Files section content
+          const filesSection = `\n\n## Files\n${filePaths.map(file => `- ${file}`).join('\n')}\n`;
+          
+          // Insert the Files section
+          const newContent = 
+            content.slice(0, insertPosition) + 
+            filesSection + 
+            content.slice(insertPosition);
+          
+          fs.writeFileSync(specPath, newContent, 'utf8');
+        } else {
+          // If no Checks section, just append to the end
+          const filesSection = `\n\n## Files\n${Object.keys(fileHashes).map(file => `- ${file}`).join('\n')}\n`;
+          fs.writeFileSync(specPath, content + filesSection, 'utf8');
+        }
       }
+      
+      // No longer add meta section for markdown files
+      // const metaYaml = yaml.stringify({ meta });
+      // const metaComment = `\n\n<!-- meta:\n${metaYaml}-->\n`;
+      
+      // // Check if meta block already exists
+      // if (content.includes('<!-- meta:')) {
+      //   // Replace existing meta block
+      //   const newContent = content.replace(/<!-- meta:[\s\S]*?-->/, metaComment);
+      //   fs.writeFileSync(specPath, newContent, 'utf8');
+      // } else {
+      //   // Add meta block at the end
+      //   fs.writeFileSync(specPath, content + metaComment, 'utf8');
+      // }
     } else if (specPath.endsWith('.yaml') || specPath.endsWith('.yml')) {
       // For YAML file, parse and add meta field
       const yamlDoc = yaml.parse(content);
-      yamlDoc.meta = meta;
+      yamlDoc.meta = {
+        files_auto: enableAutoFiles,
+        file_hashes: fileHashes
+      };
       fs.writeFileSync(specPath, yaml.stringify(yamlDoc), 'utf8');
     }
   } catch (error) {
-    console.error(`Error adding meta to spec ${specPath}:`, error);
+    console.error(`Error adding files section to spec ${specPath}:`, error);
   }
 }
 

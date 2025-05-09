@@ -1,5 +1,5 @@
 ---
-description: Detects divergence between code implementation and CheckMate specifications. Use when checking if code has changed without corresponding spec updates.
+description: "Detects divergence between code implementation and CheckMate specifications. Use when checking if code has changed without corresponding spec updates."
 type: "Agent Requested"
 globs: 
 alwaysApply: false

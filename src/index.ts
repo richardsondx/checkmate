@@ -32,6 +32,7 @@ import * as clarifyCommands from './commands/clarify.js';
 import chalk from 'chalk';
 import * as listChecksCommands from './commands/list-checks.js';
 import * as verifyLlmReasoningCommands from './commands/verify-llm-reasoning.js';
+import * as resetCommandModule from './commands/reset.js';
 
 // Initialize yargs parser
 const yargsInstance = yargs(hideBin(process.argv));
@@ -525,6 +526,7 @@ yargsInstance
     },
     async (argv: any) => {
       // Implementation of reset command
+      await resetCommandModule.resetCommand({ specName: argv.spec, quiet: argv.quiet });
     }
   )
   

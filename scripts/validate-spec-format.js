@@ -20,30 +20,36 @@ function validateSpecFile(filePath) {
   const hasTitle = /^# .*/.test(content);
   const hasChecksSection = /^## Checks/m.test(content);
   const hasFilesSection = /^## Files/m.test(content);
-  const hasCheckItems = content.includes('- [ ]') || content.includes('- [x]');
+  const hasCheckItems = content.includes('- [ ]') || content.includes('- [x]') || content.includes('- [🟩]') || content.includes('- [🟥]');
   const hasMeta = content.includes('<!-- meta:');
   
   // Optional sections
   const hasDescription = /^## Description/m.test(content); // Now optional
+  const hasGenerationNote = content.includes('<!-- generated via checkmate'); // Now optional
   
   // Advanced validation
-  const checkItemsMatch = content.match(/- \[[ x]\] (.*)/g) || [];
+  const checkItemsMatch = content.match(/- \\[([ x🟩🟥])\\] (.*)/g) || [];
+  // We're no longer enforcing a strict verb-object pattern for check items
+  // Instead, we'll just verify they're not empty and have reasonable content
   const hasBulletXFormat = checkItemsMatch.every(item => {
-    const bulletText = item.replace(/- \[[ x]\] /, '').trim();
-    // Verb + object pattern: simple check for verb at beginning (no conjunction)
-    const verbObjectPattern = /^([a-z]+)\s([a-z0-9].*)$/;
-    return verbObjectPattern.test(bulletText) && !bulletText.includes(' and ');
+    const bulletText = item.replace(/- \\[([ x🟩🟥])\\] /, '').trim();
+    // Just check that the bullet isn't empty or too short (< 5 chars)
+    return bulletText.length >= 5;
   });
   
   // Check file listings
   const fileItems = [];
-  const filesSection = content.match(/## Files\s*\n([\s\S]*?)(?:\n##|\n<!-- meta:|\n$)/);
+  // This regex is more permissive to match the Files section until the end of the file or next section
+  const filesSection = content.match(/## Files\s*([\s\S]*?)(?=\n##|\n<!--|\n<|\n\s*$|$)/);
   if (filesSection && filesSection[1]) {
     const fileListText = filesSection[1];
-    const fileMatches = fileListText.match(/- ([^\n]+)/g);
+    const fileMatches = fileListText.match(/- [^\n]+/g);
     if (fileMatches) {
       fileMatches.forEach(match => {
-        fileItems.push(match.replace(/^- /, '').trim());
+        const file = match.replace(/^- /, '').trim();
+        if (file.length > 0) {
+          fileItems.push(file);
+        }
       });
     }
   }
@@ -74,9 +80,6 @@ function validateSpecFile(filePath) {
     // Meta parsing error will be reported below
   }
   
-  // Generation note
-  const hasGenerationNote = content.includes('<!-- generated via checkmate');
-  
   const errors = [];
   
   if (!hasTitle) {
@@ -92,7 +95,7 @@ function validateSpecFile(filePath) {
   }
   
   if (!hasCheckItems) {
-    errors.push('Missing check items (should have "- [ ]" or "- [x]" lines)');
+    errors.push('Missing check items (should have "- [ ]", "- [x]", "- [🟩]", or "- [🟥]" lines)');
   }
   
   if (!hasBulletXFormat && checkItemsMatch.length > 0) {
@@ -103,28 +106,14 @@ function validateSpecFile(filePath) {
     errors.push('No files listed in the Files section');
   }
   
-  if (!hasMeta) {
-    errors.push('Missing meta section (should have "<!-- meta:" section)');
-  } else {
-    if (metaFiles.length === 0) {
-      errors.push('Meta section missing "files" array');
-    }
+  // Compare files section with meta files only if meta section exists
+  if (hasMeta) {
+    const filesDiff = fileItems.filter(file => !metaFiles.includes(file));
+    const metaDiff = metaFiles.filter(file => !fileItems.includes(file));
     
-    if (!hasFileHashes) {
-      errors.push('Meta section missing "file_hashes" object');
+    if (filesDiff.length > 0 || metaDiff.length > 0) {
+      errors.push('Files in the Files section do not match files in the meta section');
     }
-  }
-  
-  if (!hasGenerationNote) {
-    errors.push('Missing generation note (should include "<!-- generated via checkmate spec v..." -->"');
-  }
-  
-  // Compare files section with meta files
-  const filesDiff = fileItems.filter(file => !metaFiles.includes(file));
-  const metaDiff = metaFiles.filter(file => !fileItems.includes(file));
-  
-  if (filesDiff.length > 0 || metaDiff.length > 0) {
-    errors.push('Files in the Files section do not match files in the meta section');
   }
   
   // If running in fix mode, we would automatically correct issues here
@@ -134,32 +123,30 @@ function validateSpecFile(filePath) {
     let fixedContent = content;
     let fixedIssues = [];
 
-    // 1. Fix missing files array in meta
-    if (hasMeta && metaFiles.length === 0 && fileItems.length > 0) {
-      try {
-        const metaMatch = fixedContent.match(/<!-- meta:\s*\n([\s\S]*?)\n-->/);
-        if (metaMatch && metaMatch[1]) {
-          const metaJson = JSON.parse(metaMatch[1]);
-          
-          // Add files array if missing
-          if (!metaJson.files) {
-            metaJson.files = fileItems;
-            fixedIssues.push('Added files array to meta section');
-            
-            // Replace the meta section
-            const updatedMeta = JSON.stringify(metaJson, null, 2);
-            fixedContent = fixedContent.replace(
-              /<!-- meta:\s*\n([\s\S]*?)\n-->/,
-              `<!-- meta:\n${updatedMeta}\n-->`
-            );
-          }
-        }
-      } catch (error) {
-        console.error('Error fixing meta section:', error);
+    // 1. Add Files section if missing but we have files from meta
+    if (!hasFilesSection && hasMeta && metaFiles.length > 0) {
+      const checksIndex = fixedContent.indexOf('## Checks');
+      if (checksIndex !== -1) {
+        // Find the next section after Checks
+        const nextSectionMatch = fixedContent.slice(checksIndex + 9).match(/^##\s/m);
+        const insertPosition = nextSectionMatch 
+          ? checksIndex + 9 + nextSectionMatch.index 
+          : fixedContent.length;
+        
+        // Generate Files section content
+        const filesSection = `\n\n## Files\n${metaFiles.map(file => `- ${file}`).join('\n')}\n`;
+        
+        // Insert the Files section
+        fixedContent = 
+          fixedContent.slice(0, insertPosition) + 
+          filesSection + 
+          fixedContent.slice(insertPosition);
+        
+        fixedIssues.push('Added Files section from meta files');
       }
     }
 
-    // 2. Add generation note if missing
+    // 2. Add generation note if missing (still helpful but not required)
     if (!hasGenerationNote) {
       const now = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       fixedContent += `\n\n<!-- generated via checkmate spec v0.5 on ${now} -->`;

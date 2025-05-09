@@ -1,5 +1,5 @@
 ---
-description: Helps enforce automatic fixing of failing CheckMate checks by continuing fix attempts until max_attempts is reached. Use when verification fails to ensure comprehensive fixing.
+description: "Helps enforce automatic fixing of failing CheckMate checks by continuing fix attempts until max_attempts is reached. Use when verification fails to ensure comprehensive fixing."
 type: "Agent Requested"
 globs: 
 alwaysApply: false

@@ -1,25 +1,33 @@
 {
-  "timestamp": "2025-05-09T00:39:50.583Z",
+  "timestamp": "2025-05-09T04:41:26.886Z",
   "features": [
     {
-      "slug": "ai-reasoning-verification",
-      "title": "AI Reasoning Verification"
+      "slug": "spec-generator",
+      "title": "Spec generator"
     },
     {
-      "slug": "automated-file-discovery",
-      "title": "Automated File Discovery"
+      "slug": "runner",
+      "title": "Runner"
     },
     {
-      "slug": "cache-management",
-      "title": "Cache Management"
+      "slug": "watcher",
+      "title": "Watcher"
     },
     {
-      "slug": "feature-drafting",
-      "title": "Feature Drafting"
+      "slug": "path-diff",
+      "title": "Path diff"
     },
     {
-      "slug": "model-configuration",
-      "title": "Model Configuration"
+      "slug": "model-slots",
+      "title": "Model slots"
+    },
+    {
+      "slug": "reset-policy",
+      "title": "Reset policy"
+    },
+    {
+      "slug": "optional-log",
+      "title": "Optional log"
     }
   ]
 }

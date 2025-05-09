@@ -237,14 +237,26 @@ Analyze this step by step, then respond with only "PASS" or "FAIL: brief explana
     } else {
       // Handle Markdown specs
       try {
-        updatedContent = updateMarkdownCheckStatus(content, check.text || check.require || '', isPassing);
+        let updatedOrError = updateSpecFileWithCheckMark(content, check.text || check.require || '', isPassing, specPath, options);
+        if (typeof updatedOrError === 'object' && updatedOrError.error) {
+          // Error already logged by updateSpecFileWithCheckMark if not quiet
+          // Consider how to propagate this error or handle it
+          // For now, let's rethrow or return an error status from the command itself
+          return { 
+            error: true, 
+            message: updatedOrError.message, 
+            passed: false, 
+            reason: `Failed to update spec file: ${updatedOrError.message}` 
+          };
+        }
+        updatedContent = updatedOrError as string;
       } catch (mdError) {
         if (!options.quiet) {
-          console.error(chalk.red(`❌ Error updating Markdown spec: ${mdError instanceof Error ? mdError.message : String(mdError)}`));
+          console.error(chalk.red(`❌ Error processing Markdown spec update: ${mdError instanceof Error ? mdError.message : String(mdError)}`));
         }
         return {
           error: true,
-          message: `Error updating Markdown spec: ${mdError instanceof Error ? mdError.message : String(mdError)}`
+          message: `Error processing Markdown spec update: ${mdError instanceof Error ? mdError.message : String(mdError)}`
         };
       }
     }
@@ -256,7 +268,7 @@ Analyze this step by step, then respond with only "PASS" or "FAIL: brief explana
     if (isPassing) {
       if (!options.quiet) {
         console.log(chalk.green(`✅ Logical verification PASSED for check "${check.text || check.require || ''}"`));
-        console.log(chalk.green(`✅ Spec "${path.basename(specPath)}" has been updated, check marked as [✓]`));
+        console.log(chalk.green(`✅ Spec "${path.basename(specPath)}" has been updated, check marked as [🟩]`));
       }
       return {
         success: true,
@@ -270,7 +282,7 @@ Analyze this step by step, then respond with only "PASS" or "FAIL: brief explana
       if (!options.quiet) {
         console.log(chalk.red(`❌ Logical verification FAILED for check "${check.text || check.require || ''}"`));
         console.log(chalk.red(`❌ Reason: ${failureReason}`));
-        console.log(chalk.red(`✍️ Spec "${path.basename(specPath)}" has been updated, check marked as [✖]`));
+        console.log(chalk.red(`✍️ Spec "${path.basename(specPath)}" has been updated, check marked as [🟥]`));
       }
       return {
         success: false,
@@ -295,15 +307,58 @@ Analyze this step by step, then respond with only "PASS" or "FAIL: brief explana
 /**
  * Update the status of a check in a Markdown spec file
  */
-function updateMarkdownCheckStatus(content: string, checkText: string, isPassing: boolean): string {
-  // Escape special characters for regex
+function updateSpecFileWithCheckMark(
+  content: string, 
+  checkText: string, 
+  isPassing: boolean,
+  specPath: string,
+  options: { quiet?: boolean } = {}
+): string | { error: boolean, message: string } {
+  // Escape regex special characters in checkText
   const escapedCheckText = checkText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   
-  // Replace the check line with updated status
-  const checkboxRegex = new RegExp(`- \\[([ xX✖])\\] ${escapedCheckText}`, 'g');
-  const newStatus = isPassing ? 'x' : '✖';
+  // Regex to find the checkbox line, allowing for x, X, ✓, ✖ or space initially
+  // This ensures we can find and replace old formats too.
+  const checkboxRegex = new RegExp(`- \\[([ xX✓✖])\\] ${escapedCheckText}`);
+  const newStatusChar = isPassing ? '🟩' : '🟥'; // Use new emoji markers
   
-  return content.replace(checkboxRegex, `- [${newStatus}] ${checkText}`);
+  const newCheckLine = `- [${newStatusChar}] ${checkText}`;
+
+  // Check if the line exists with any of the old markers or space
+  if (checkboxRegex.test(content)) {
+    const updatedContent = content.replace(checkboxRegex, newCheckLine);
+    // It's good practice to check if replacement actually happened, 
+    // though .replace with a non-global regex that matches should always replace one instance.
+    if (fs.existsSync(specPath)) {
+      try {
+        fs.writeFileSync(specPath, updatedContent, 'utf8');
+        if (!options.quiet) {
+          if (isPassing) {
+            console.log(chalk.green(`✅ Spec "${path.basename(specPath)}" has been updated, check marked as [🟩]`));
+          } else {
+            console.log(chalk.red(`✍️ Spec "${path.basename(specPath)}" has been updated, check marked as [🟥]`));
+          }
+        }
+        return updatedContent;
+      } catch (error) {
+        if (!options.quiet) {
+          console.error(chalk.red(`❌ Error writing updated spec file "${specPath}": ${error instanceof Error ? error.message : String(error)}`));
+        }
+        return { error: true, message: `Failed to write spec file: ${specPath}` };
+      }
+    } else {
+        if (!options.quiet) {
+            console.error(chalk.red(`❌ Spec file not found for writing: "${specPath}"`));
+        }
+        return { error: true, message: `Spec file not found: ${specPath}` };
+    }
+  } else {
+    if (!options.quiet) {
+      console.warn(chalk.yellow(`⚠️ Could not find check line to update in "${specPath}" for: "${checkText}". Spec file might be out of sync or check text changed.`));
+    }
+    // Return original content if line not found, or indicate no update was made
+    return content; // Or return an object indicating no update if preferred
+  }
 }
 
 // When the module is executed directly, run the verify-llm-reasoning command

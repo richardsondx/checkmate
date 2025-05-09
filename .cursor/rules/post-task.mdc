@@ -1,0 +1,13 @@
+---
+description: Runs after each task to verify changes against affected specs and apply auto-fixes as needed.
+type: "Agent Requested"
+globs: 
+alwaysApply: false
+---
+# CheckMate – Verify & Auto‑Fix
+- Execute: node scripts/cm-enforce.js run \
+           --target "$(jq -r '.[]' .cursor/cm_list.json)" \
+           --fail-early
+- Env:
+    CM_MAX_FIXES: 5
+    CM_FIX_COUNT: $CM_FIX_COUNT

@@ -1,5 +1,5 @@
 ---
-description: Ensures CheckMate spec files follow proper naming conventions with slugified names, lowercase letters, and hyphens. Use when creating new spec files.
+description: "Ensures CheckMate spec files follow proper naming conventions with slugified names, lowercase letters, and hyphens. Use when creating new spec files."
 type: "Agent Requested"
 globs: 
 alwaysApply: false

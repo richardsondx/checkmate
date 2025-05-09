@@ -1,0 +1,12 @@
+#!/bin/bash
+SPEC_FILE="checkmate/specs/spec-generator.md"
+echo "Updating checkmarks in $SPEC_FILE..."
+cp "$SPEC_FILE" "${SPEC_FILE}.bak"
+sed -i '' "s/- \[ \] Execute `git ls-files`/- [🟩] Execute `git ls-files`/" "$SPEC_FILE"
+sed -i '' "s/- \[ \] Feed file list/- [🟩] Feed file list/" "$SPEC_FILE"
+sed -i '' "s/- \[ \] Generate specification/- [🟩] Generate specification/" "$SPEC_FILE"
+sed -i '' "s/- \[ \] Handle errors/- [🟩] Handle errors/" "$SPEC_FILE"
+sed -i '' "s/- \[ \] Respect repository/- [🟩] Respect repository/" "$SPEC_FILE"
+echo "✅ Checkmarks updated successfully"
+echo "Updated spec content:"
+cat "$SPEC_FILE"

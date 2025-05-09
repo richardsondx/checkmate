@@ -109,110 +109,6 @@ This document tracks the improvements made to the CheckMate CLI to enable reliab
   - Added diagrams for key processes
   - Included extension points and future directions
 
-## Testing Results
-
-The implementation successfully:
-- Splits complex requirements like "Find by Issues and by Repositories" into distinct features
-- Ranks files by relevance to each feature
-- Generates detailed, testable specifications
-- Works with or without Git for file tracking
-- Shows clear progress with visual feedback
-- Integrates cleanly with Cursor through multiple methods
-
-## Production Readiness Notes
-
-For full production deployment, the following issues need to be addressed:
-
-1. **API Parameter Fix**: The OpenAI API parameters need to be updated for newer models:
-   - We discovered during testing that newer models like GPT-4o require `max_completion_tokens` instead of `max_tokens`
-   - This change has been implemented but would need thorough testing with a valid API key
-
-2. **Error Handling**: 
-   - Add more robust error handling for cases where:
-     - OpenAI API is unavailable
-     - The model doesn't generate valid JSON
-     - Files cannot be read or written
-
-3. **Rate Limiting**:
-   - Implement rate limiting and retry logic for API calls
-   - Add queueing for large batches of spec generations
-
-4. **Testing Coverage**:
-   - Expand test suite to cover:
-     - All new components
-     - Integration between components
-     - Edge cases with various input types
-
-5. **Performance Optimization**:
-   - For larger codebases, optimize the context builder to use more efficient file scanning
-   - Consider implementing caching for file contents to speed up relevance scoring
-
-## Next Steps
-
-- **Additional Testing**: Test with larger repositories to ensure performance
-- **CI Integration**: Add GitHub Actions workflow for spec validation
-- **UI Improvements**: Consider a web UI for spec visualization
-- **PRD Integration**: Enhance PRD parsing to extract more structured requirements
-- **Spec Format Consistency**: Implement coordinated update to align YAML "requirements" with markdown "checks":
-  
-  **Implementation Plan:**
-  1. **Code Updates**:
-     - Update `src/lib/specs.ts` to handle both "requirements" and "checks" fields in YAML parsing
-     - Modify `parseYamlSpec` and `validateYamlSpecStructure` functions
-     - Update the `Spec` interface to use a unified terminology
-     - Add backward compatibility for old-format files
-
-  2. **Promotion Tool**:
-     - Update `src/commands/promote.ts` to use "checks" instead of "requirements" when generating YAML
-     - Maintain compatibility with existing test code extraction logic
-
-  3. **Test Updates**:
-     - Update `test-spec-types.mjs` to test both formats during the transition
-     - Add tests specifically for the format migration
-
-  4. **Migration Script**:
-     - Create `convert-specs.ts` utility to update all agent YAML files:
-       ```typescript
-       // Convert YAML format from requirements to checks
-       function migrateSpecFile(filePath) {
-         const content = fs.readFileSync(filePath, 'utf8');
-         const data = parseYaml(content);
-         if (data.requirements && !data.checks) {
-           data.checks = data.requirements;
-           delete data.requirements;
-           
-           // Also rename internal fields
-           data.checks.forEach(check => {
-             if (check.require && !check.check) {
-               check.check = check.require;
-               delete check.require;
-             }
-           });
-           
-           fs.writeFileSync(filePath, stringifyYaml(data), 'utf8');
-           return true; // File was migrated
-         }
-         return false; // No migration needed
-       }
-       ```
-
-  5. **Documentation**:
-     - Update README and docs to reflect the new terminology
-     - Add a note about the change in the CHANGELOG
-     - Update examples to use consistent terminology
-
-  6. **Rollout Strategy**:
-     - Phase 1: Add support for reading both formats
-     - Phase 2: Convert existing files with migration script
-     - Phase 3: Update the spec creation to use new format only
-
-## agent‑spec support
-
-✅ loader glob updated
-✅ --agent flag implemented
-✅ promote command done
-✅ README new section added
-
 ### 9. LLM-Driven Test-Driven Development (TDD) Workflow
 
 - **Conceptual Shift**: Moved from CheckMate-as-verifier (running its own tests) to CheckMate-as-LLM-collaborator for TDD.
@@ -244,5 +140,123 @@ For full production deployment, the following issues need to be addressed:
 - **Spec ID Simplification:**
   - Moved from complex generated/embedded IDs in spec files to simple 1-based positional IDs for check items. This simplifies parsing and usage by the LLM.
 
-- **Documentation Updates:**
-  - `README.md` and `memory-docs/architectures.md` updated to reflect the new workflow, commands, and data flow.
+### 10. Cursor Rules Consolidation and Cleanup
+
+- **Rule Format Standardization**:
+  - Converted all Cursor rules to use the `.mdc` format (Markdown-based Cursor rules) for consistency
+  - Removed redundant JSON-format rules that duplicated functionality
+  - Updated rule installation script to properly handle content types
+
+- **Rule File Improvements**:
+  - Created a more robust `checkmate-spec-naming-convention.mdc` rule to replace the unused JavaScript implementation
+  - Ensured all MDC rules are properly installed during `checkmate init`
+  - Removed outdated `audit-after-fix.md` rule that referenced removed commands
+
+- **Setup Script Enhancements**:
+  - Updated `setup-cursor-rules.js` to write MDC files as plain text rather than JSON
+  - Added support for all essential rule files during initialization
+  - Added proper file format detection with isJson flag
+
+- **Documentation Improvements**:
+  - Added comprehensive comments in rules to explain their purpose
+  - Updated Cursor integration documentation to reflect current rule setup
+  - Ensured all rule files follow consistent naming conventions and style
+
+### 11. Specification Format Standardization
+
+- **Simplified Format Structure**:
+  - Removed complex `<!-- meta: ... -->` sections with file hashes in favor of a simple `## Files` section
+  - Updated spec validator to make meta sections optional rather than required
+  - Created migration script to automatically convert existing specs to the new format
+
+- **Format Validator Improvements**:
+  - Modified `validate-spec-format.js` to support the new simplified format
+  - Made meta validation conditional on the presence of meta sections
+  - Preserved backward compatibility for older spec formats
+
+- **Migration Tools**:
+  - Created `scripts/migrate/remove-meta-sections.js` to convert specs to the new format
+  - Extracted file paths from meta sections and added them to the `## Files` section
+  - Ensured clean removal of meta sections while preserving all relevant information
+
+- **Benefits of Simplified Format**:
+  - Better aligns with the LLM-driven TDD workflow where LLMs work directly with human-readable specs
+  - Improves readability for both humans and LLMs
+  - Reduces technical debt from maintaining complex file hash tracking
+  - Makes it easier to create and edit specs manually
+
+## Testing Results
+
+The implementation successfully:
+- Splits complex requirements like "Find by Issues and by Repositories" into distinct features
+- Ranks files by relevance to each feature
+- Generates detailed, testable specifications
+- Works with or without Git for file tracking
+- Shows clear progress with visual feedback
+- Integrates cleanly with Cursor through multiple methods
+- Validates LLM reasoning about implementation through the TDD workflow
+
+## Production Readiness Notes
+
+For full production deployment, the following issues need to be addressed:
+
+1. **API Parameter Fix**: The OpenAI API parameters need to be updated for newer models:
+   - We discovered during testing that newer models like GPT-4o require `max_completion_tokens` instead of `max_tokens`
+   - This change has been implemented but would need thorough testing with a valid API key
+
+2. **Error Handling**: 
+   - Add more robust error handling for cases where:
+     - OpenAI API is unavailable
+     - The model doesn't generate valid JSON
+     - Files cannot be read or written
+
+3. **Rate Limiting**:
+   - Implement rate limiting and retry logic for API calls
+   - Add queueing for large batches of spec generations
+
+4. **Testing Coverage**:
+   - Expand test suite to cover:
+     - All new components
+     - Integration between components
+     - Edge cases with various input types
+
+5. **Performance Optimization**:
+   - For larger codebases, optimize the context builder to use more efficient file scanning
+   - Consider implementing caching for file contents to speed up relevance scoring
+
+## Next Steps
+
+### Short-term Priorities
+
+1. **Rule Validation Testing**: Test the updated Cursor rules in different environments to ensure consistent behavior
+2. **CI Integration**: Add GitHub Actions workflow for spec validation
+3. **Performance Testing**: Test with larger repositories to ensure the context builder performs well
+4. **Command Deprecation Notices**: Add clear deprecation notices for commands that have been replaced
+
+### Medium-term Goals
+
+1. **Web UI**: Develop a simple web dashboard for spec visualization and status tracking
+2. **Enhanced LLM TDD Flow**: Improve the LLM-driven TDD workflow with more sophisticated reasoning checks
+3. **PRD Integration**: Enhance PRD parsing to extract more structured requirements
+4. **Spec Format Consistency**: Complete the migration from "requirements" to "checks" terminology
+
+### For Future AI Engineers
+
+If you're working on CheckMate, here are the key architectural principles to follow:
+
+1. **LLM as Collaborator**: The core design principle is that CheckMate serves as a framework for LLMs to perform TDD. CheckMate provides the structure and validation but doesn't execute tests directly.
+
+2. **Command Simplicity**: Keep commands focused on a single responsibility. The most important commands are:
+   - `list-checks`: Retrieve a checklist
+   - `verify-llm-reasoning`: Validate an LLM's reasoning about implementation
+   - `gen`/`create`: Generate specs from descriptions
+
+3. **Cursor Integration**: Cursor rules are the primary user interface for CheckMate. Ensure rules remain idempotent and follow MDC format conventions.
+
+4. **User Experience**: Always prioritize clear feedback and understandable error messages. Use progress indicators for long-running operations.
+
+5. **Extensibility**: The system is designed to be extended with new commands and integrations. Follow the existing patterns when adding new functionality.
+
+6. **Spec Format Standard**: Always use the simplified spec format with a `## Files` section listing relevant files. The older `<!-- meta: ... -->` format with file hashes is deprecated. This makes specs more readable for both humans and LLMs.
+
+Remember that the PRD (`memory-docs/prd.md`) and architecture documentation (`memory-docs/architectures.md`) should be updated whenever significant changes are made to ensure they remain accurate references.

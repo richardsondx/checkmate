@@ -1,5 +1,5 @@
 ---
-description: Helps fix issues in CheckMate spec files, including formatting and content problems. Use when specs need correction or standardization.
+description: "Helps fix issues in CheckMate spec files, including formatting and content problems. Use when specs need correction or standardization."
 type: "Agent Requested"
 globs: 
 alwaysApply: false
