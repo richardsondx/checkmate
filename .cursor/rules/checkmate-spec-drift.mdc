@@ -1,0 +1,3 @@
+# CheckMate · Spec‑vs‑Code Drift Audit
+- After each commit, audit changed specs
+  - Execute: checkmate audit --target "$CM_LIST" --quiet --audit

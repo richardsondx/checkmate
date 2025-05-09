@@ -1,76 +1,123 @@
-# Cursor Integration with CheckMate
+# CheckMate Cursor Integration
 
-CheckMate is designed for deep integration with AI coding assistants like Cursor, enabling a powerful LLM-driven Test-Driven Development (TDD) workflow.
+CheckMate is designed for deep integration with AI coding assistants like Cursor. This document explains how to use CheckMate effectively with Cursor AI.
 
-## Core Concept: LLM-Driven TDD
+## Key Integration Rule
 
-Instead of CheckMate running tests itself, the LLM (Cursor) drives the verification process. CheckMate acts as a collaborator by:
-1.  **Providing the Checklist**: Giving the LLM the specific requirements (checks) from a spec file.
-2.  **Validating Reasoning**: Checking if the LLM's self-assessment of whether a check passes or fails is logically sound based on the LLM's own criteria and findings.
+The primary integration happens through the `checkmate-feature-validation-workflow.mdc` rule, located in the `.cursor/rules/` directory. 
 
-## Key Commands for Integration
+This rule is triggered when you ask Cursor to work on a feature using CheckMate. It orchestrates the TDD loop by:
 
--   `checkmate list-checks --spec <slug>`: Retrieves the checks for a feature, assigning positional IDs (1, 2, 3...). Crucial for feeding the LLM the list of tasks.
--   `checkmate verify-llm-reasoning --spec <slug> --check-id <id> ...`: The core validation step. The LLM provides its success/failure conditions and outcome report for a check, and CheckMate verifies the logic.
+1. Calling `checkmate list-checks` to provide Cursor with a checklist for the specified feature
+2. Instructing Cursor to define success/failure conditions, verify/implement code, and report outcomes
+3. Guiding Cursor to use `checkmate verify-llm-reasoning` to validate its assessments
 
-## The Primary Integration Rule: `checkmate-feature-validation-workflow.mdc`
+## LLM-Driven TDD Workflow
 
-This rule, automatically created in `.cursor/rules/` when you run `checkmate init`, orchestrates the TDD loop within Cursor.
+Here's how the workflow unfolds in detail:
 
-### How it Works:
+1. **Initiate the workflow:**
+   Type in Cursor: `/@checkmate-tdd user-password-reset`
 
-1.  **Trigger**: You initiate the workflow by telling Cursor to work on a feature using a specific command pattern, typically `/@checkmate-tdd <feature-slug>` or `/checkmate-tdd <feature-slug>`.
+2. **CheckMate provides check items to Cursor:**
+   ```
+   📋 Retrieving check items from spec: checkmate/specs/user-password-reset.md
+   🔍 Found check items to validate:
+   🧪 Check #1: System generates a unique, single-use password reset token
+   🧪 Check #2: User receives an email with a link containing the reset token
+   🧪 Check #3: Clicking the link allows the user to set a new password
+   🧪 Check #4: The reset token is invalidated after use or expiration
+   ```
 
-2.  **Rule Activation**: The pattern matches, and the `.mdc` rule script executes.
+3. **CheckMate gives Cursor these instructions:**
+   ```
+   📝 INSTRUCTIONS FOR CURSOR:
+   ---
+   1. For each check item above, you must:
+      a. Define explicit success and failure conditions
+      b. Examine the codebase (or write it if it doesn't exist) to verify if it meets your conditions
+      c. Report your findings as an outcome report
+      d. Call `checkmate verify-llm-reasoning` to validate your reasoning
+      
+   2. Example usage:
+      `checkmate verify-llm-reasoning --spec user-password-reset --check-id 1 \
+         --success-condition "A cryptographically secure unique token is generated and stored with an expiry." \
+         --failure-condition "Token is predictable, not unique, or has no expiry." \
+         --outcome-report "Observed UUID v4 generation for token and a 1-hour expiry in token_service.js."`
+         
+   3. Continue until all checks have been verified
+   ---
+   ```
 
-3.  **Check Retrieval**: The script calls `checkmate list-checks --spec <feature-slug> --format json --quiet` to get the checks for the specified feature.
+4. **Cursor implements/verifies code for each check**
+   For each check item, Cursor will:
+   - Define success and failure conditions
+   - Examine or implement code
+   - Report its findings
+   - Call verify-llm-reasoning to validate its reasoning
 
-4.  **LLM Instruction**: The script parses the JSON output and presents the list of checks (with their positional IDs) to the LLM (Cursor). It also provides detailed instructions on how the LLM should proceed:
-    *   Iterate through each check ID.
-    *   For each check:
-        *   Define explicit **Success Conditions (SC)**.
-        *   Define explicit **Failure Conditions (FC)**.
-        *   Implement or verify the code related to the check.
-        *   Formulate a concise **Outcome Report (OR)** summarizing the findings.
-        *   Call `checkmate verify-llm-reasoning` with the spec slug, check ID, SC, FC, and OR.
+5. **CheckMate responds to Cursor:**
+   When a check passes:
+   ```
+   ✅ Logical verification PASSED for check "System generates a unique, single-use password reset token"
+   ✅ Spec "user-password-reset.md" has been updated, check marked as [✓]
+   ```
 
-5.  **LLM Execution Loop**: Cursor (the LLM) now takes over, following the instructions:
-    *   It focuses on Check #1.
-    *   Defines SC/FC.
-    *   Writes/reviews code.
-    *   Creates an OR.
-    *   Invokes `checkmate verify-llm-reasoning --spec <slug> --check-id 1 --success-condition "..." ...`.
+   If verification fails:
+   ```
+   ❌ Logical verification FAILED for check "Password is hashed using bcrypt"
+   ❌ Reason: The outcome report states SHA256 was used, which does not meet the success condition of using bcrypt.
+   ```
 
-6.  **Reasoning Validation & Feedback**: CheckMate runs its AI validation:
-    *   If the reasoning is **PASS**: CheckMate updates the spec file (marks check #1 as passed `[x]`) and informs the LLM. The LLM moves to Check #2.
-    *   If the reasoning is **FAIL**: CheckMate updates the spec file (marks check #1 as failed `[✖]`), provides the failure reason from the validation model, and informs the LLM. The LLM uses this feedback to potentially revise its SC/FC, re-evaluate the code, update its OR, and call `verify-llm-reasoning` again for check #1.
+   Cursor uses this feedback to refine its implementation or assessment.
 
-7.  **Completion**: The loop continues until all checks for the feature spec have received a PASS from `verify-llm-reasoning`.
+## Sample Cursor Prompts
 
-## Sample Cursor Prompts for TDD Workflow
+Beyond the main workflow, you can use these prompts in Cursor:
 
-**Initiate TDD:**
+### Get a list of features
+```
+What features are tracked by CheckMate?
+```
+(Cursor may run `checkmate features`)
 
-> `/@checkmate-tdd user-profile-editing`
+### Create a new spec
+```
+Create a CheckMate spec for a feature that allows users to upload profile pictures.
+```
+(Cursor may run `checkmate gen "..."`)
 
-*(Cursor will then execute the rule, call `list-checks`, and begin the iterative process)*
+### Get help for a failing check
+```
+The second check for 'profile-picture-upload' is unclear. Can CheckMate clarify it?
+```
+(Cursor may run `checkmate clarify profile-picture-upload --bullet 2`)
 
-**Example Interaction (LLM calling CheckMate):**
+## Available Rules
 
-*(After processing Check #2 for `user-profile-editing`)*
-> ```bash
-> checkmate verify-llm-reasoning --spec user-profile-editing --check-id 2 \
->   --success-condition "User can update their display name and it persists in the database" \
->   --failure-condition "Update fails or does not persist" \
->   --outcome-report "Modified user model save method; test confirmed database update via GET request"
-> ```
+CheckMate's Cursor integration includes several rules in the `.cursor/rules/` directory:
 
-**Example CheckMate Feedback to LLM (Failure):**
+- `checkmate-feature-validation-workflow.mdc` - Primary TDD workflow
+- `checkmate-spec-creator.mdc` - Helps create new specs
+- `checkmate-spec-fixer.mdc` - Assists in fixing failing checks
 
-> `❌ Logical verification FAILED for check "User display name updates persist"`
-> `❌ Reason: The outcome report confirms the save method was modified but does not explicitly confirm the *persistence* was checked via a subsequent read/GET request, only that the update *endpoint* was likely called.`
+## Command Reference for Cursor Integration
 
-*(Cursor should now re-evaluate based on the feedback - perhaps by adding a specific database read to its verification step and updating the outcome report).* 
+These commands are commonly used with Cursor:
+
+| Command | Description |
+|---------|-------------|
+| `checkmate list-checks <spec>` | Lists all check items for a specification |
+| `checkmate verify-llm-reasoning --spec <spec> --check-id <id> ...` | Validates an LLM's reasoning about a check item |
+| `checkmate status <spec>` | Shows the current status of all checks for a spec |
+| `checkmate clarify <spec> --bullet <id>` | Gets AI explanation for a failing/unclear check |
+
+## Setting Up Cursor Integration
+
+1. Install CheckMate in your project
+2. Run `npx checkmate init` to create necessary rule files
+3. Configure API keys in your `.checkmate` file
+4. Start the TDD workflow with `/@checkmate-tdd <feature-slug>`
 
 ## Other Useful Commands via Cursor
 

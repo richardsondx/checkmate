@@ -1,0 +1,29 @@
+{
+  "name": "CheckMate Verify Fail-Fast",
+  "description": "Ensures verify script always runs with fail-early options",
+  "priority": 6,
+  "triggers": [
+    "onCommand"
+  ],
+  "condition": {
+    "commandPatterns": [
+      ".*checkmate.*verify.*",
+      ".*spec-verify.*",
+      ".*npm.*run.*verify.*"
+    ]
+  },
+  "actions": [
+    {
+      "name": "validateSpecsStrict",
+      "type": "shell",
+      "command": "cd $WORKSPACE_DIR && node scripts/validate-spec-strict.js",
+      "runningMessage": "Validating all specs with strict checks...",
+      "finishedMessage": "Strict spec validation complete",
+      "errorMessage": "⚠️ Strict spec validation failed! All specs must follow the CheckMate format."
+    }
+  ],
+  "config": {
+    "runType": "auto",
+    "continueOnError": false
+  }
+}

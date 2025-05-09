@@ -1,0 +1,27 @@
+{
+  "name": "CheckMate Non-Interactive Mode",
+  "description": "Ensures Checkmate commands always run in non-interactive mode to prevent hanging",
+  "priority": 7,
+  "triggers": [
+    "onCommand"
+  ],
+  "condition": {
+    "commandPatterns": [
+      ".*checkmate.*",
+      ".*npx.*checkmate.*"
+    ]
+  },
+  "actions": [
+    {
+      "name": "modifyCommand",
+      "type": "transform",
+      "pattern": "(.*checkmate\\s+\\w+)(\\s+.*|$)",
+      "replacement": "$1 --yes --non-interactive$2",
+      "explanation": "Adding non-interactive flags to prevent command from waiting for user input"
+    }
+  ],
+  "config": {
+    "runType": "auto",
+    "continueOnError": true
+  }
+}

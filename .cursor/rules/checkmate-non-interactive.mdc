@@ -1,0 +1,5 @@
+# CheckMate · Non‑Interactive Transform
+- CommandTransform:
+    Pattern: '(checkmate\s+\w+)(\s|$)'
+    Replacement: '$1 --yes --non-interactive$2'
+    Explanation: Ensure every CheckMate command runs headless

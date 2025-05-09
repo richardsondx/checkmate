@@ -1,79 +1,51 @@
----
-description: 
-globs: 
-alwaysApply: false
----
-# CheckMate · LLM-Driven TDD Workflow
+/*
+# CheckMate Feature Validation Workflow
 
-This rule initiates the LLM-driven Test-Driven Development workflow using CheckMate's spec files.
+This rule enforces a standard workflow when asked to use CheckMate to validate that a feature is working correctly.
+*/
 
-```rule type=activation
-activationTrigger:
-  event: command
-  pattern: "(\\\\checkmate-tdd|/checkmate-tdd) (\\S+)"
-  maxRuns: 1
-```
+const workflowRule = {
+  name: "CheckMate Feature Validation Workflow",
+  description: "Enforce a consistent process for validating features with CheckMate",
+  run: async ({ cursor }) => {
+    // Define the workflow steps in the ruleset
+    const workflowSteps = [
+      "1. Check if a spec exists for the feature being validated",
+      "2. If no spec exists, suggest creating one and wait for user confirmation",
+      "3. Create the spec in checkmate/specs/ directory (NOT in root)",
+      "4. Use the audit command to verify implementation against spec",
+      "5. If audit fails, attempt fixes until reaching max_attempts (from .checkmate)",
+      "6. Report final status with detailed breakdown of passing and failing checks"
+    ];
 
-```rule type=on_activation
-# LLM-Driven TDD Workflow
-SPEC_SLUG=$MATCH_2  # Extract the spec slug from the command
+    // Feature spec location rules
+    const specLocationRules = [
+      "- All CheckMate specs MUST be stored in the checkmate/specs/ directory",
+      "- Specs should use kebab-case for filenames (e.g., feature-name.md)",
+      "- Agent specs should be placed in checkmate/specs/agents/ subdirectory"
+    ];
 
-echo "🧪 Starting CheckMate LLM-Driven TDD Workflow for spec: $SPEC_SLUG"
+    // Auto-fix enforcement rules
+    const autoFixRules = [
+      "- When a feature validation FAILS, ALWAYS continue fixing until max_attempts is reached",
+      "- Track fix attempts with a counter and continue until max_attempts (5 by default)",
+      "- Each fix attempt should address specific failing checks with targeted changes",
+      "- After each fix attempt, rerun audit to check if all checks now pass",
+      "- Only stop fixing when either all checks PASS or max_attempts is reached"
+    ];
 
-# Check if the spec exists
-if [ ! -f "checkmate/specs/$SPEC_SLUG.md" ] && [ ! -f "checkmate/specs/$SPEC_SLUG.yaml" ]; then
-  # Try to find the spec with fuzzy matching
-  SPEC_PATH=$(node ./dist/index.js status --target "$SPEC_SLUG" --json 2>/dev/null | grep -o '"path":"[^"]*"' | grep -o '[^"]*$')
-  
-  if [ -z "$SPEC_PATH" ]; then
-    echo "❌ Spec '$SPEC_SLUG' not found. Please check that it exists or run 'checkmate warmup' to generate specs."
-    exit 1
-  fi
-else
-  # Use the provided slug
-  if [ -f "checkmate/specs/$SPEC_SLUG.md" ]; then
-    SPEC_PATH="checkmate/specs/$SPEC_SLUG.md"
-  else
-    SPEC_PATH="checkmate/specs/$SPEC_SLUG.yaml"
-  fi
-fi
+    console.log("Following CheckMate Feature Validation Workflow:");
+    console.log(workflowSteps.join("\n"));
+    console.log("\nSpec Location Rules:");
+    console.log(specLocationRules.join("\n"));
+    console.log("\nAuto-Fix Enforcement Rules:");
+    console.log(autoFixRules.join("\n"));
 
-# Get check items from the spec
-echo "📋 Retrieving check items from spec: $SPEC_PATH"
-CHECK_ITEMS=$(node ./dist/index.js list-checks --spec "$SPEC_PATH" --format json --quiet)
+    return {
+      success: true,
+      message: "Remember to follow the CheckMate Feature Validation Workflow with continuous fix attempts"
+    };
+  }
+};
 
-# Check if there was an error retrieving check items
-if [[ "$CHECK_ITEMS" == *"error"* ]]; then
-  echo "❌ Error retrieving check items: $CHECK_ITEMS"
-  exit 1
-fi
-
-# Extract check IDs and text to pass to Cursor
-echo "🔍 Found check items to validate:"
-echo "$CHECK_ITEMS" | grep -o '"id":"[^"]*","text":"[^"]*"' | while read -r check; do
-  ID=$(echo "$check" | grep -o '"id":"[^"]*"' | grep -o '[^"]*$')
-  TEXT=$(echo "$check" | grep -o '"text":"[^"]*"' | grep -o '[^"]*$')
-  
-  # Prepare prompt for Cursor
-  echo "🧪 Check #$ID: $TEXT"
-done
-
-# Now hand off to cursor with these instructions
-echo "📝 INSTRUCTIONS FOR CURSOR:"
-echo "---"
-echo "1. For each check item above, you must:"
-echo "   a. Define explicit success and failure conditions"
-echo "   b. Examine the codebase to verify if it meets your conditions"
-echo "   c. Report your findings as an outcome report"
-echo "   d. Call \`checkmate verify-llm-reasoning\` to validate your reasoning"
-echo "2. Example usage:"
-echo "   \`checkmate verify-llm-reasoning --spec $SPEC_SLUG --check-id [ID] \\"
-echo "      --success-condition \"Database password is securely hashed with bcrypt\" \\"
-echo "      --failure-condition \"Password is stored in plaintext\" \\"
-echo "      --outcome-report \"Found bcrypt hash implementation in user.js line 42\"\`"
-echo "3. Continue until all checks have been verified"
-echo "---"
-echo "🚀 Now Cursor AI will proceed with the LLM-Driven TDD workflow..."
-
-# Exit with success - Cursor will now take over
-exit 0
+export default workflowRule;
