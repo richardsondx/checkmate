@@ -1,6 +1,6 @@
 {
   "name": "checkmateai",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "AI-powered specs verification that block bad code, challenges AI's overconfidence, and prevent AI from breaking your code",
   "main": "dist/index.js",
   "type": "module",
@@ -41,9 +41,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/string-similarity": "^4.0.2",
     "@types/yargs": "^17.0.33",
-    "chokidar": "^4.0.3",
     "execa": "^9.5.2",
-    "inquirer": "^12.6.0",
     "simple-git": "^3.27.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.4",
@@ -89,7 +87,9 @@
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
     "yaml": "^2.7.1",
-    "yargs": "^17.7.2"
+    "yargs": "^17.7.2",
+    "inquirer": "^12.6.0",
+    "chokidar": "^4.0.3"
   },
   "overrides": {
     "punycode": "npm:punycode.js@^2.3.1"
