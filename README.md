@@ -1,4 +1,9 @@
-# CheckMate
+# CheckMate ⬜️⬛️⬜️ | [![Star on GitHub](https://img.shields.io/github/stars/checkmateai/checkmate?style=social)](https://github.com/checkmateai/checkmate/stargazers)
+
+By [@Richardsondx](https://x.com/richardsondx)
+
+[![CheckMate Demo](https://img.youtube.com/vi/A2sqyblVxZk/0.jpg)](https://youtu.be/A2sqyblVxZk)
+
 
 AI-powered specs verification that block bad code, see through hallucination, and prevent AI from breaking your code.
 
@@ -6,284 +11,204 @@ CheckMate is an AI Test Driven Development tool that challenges AI's overconfide
 
 It's built with Cursor AI in mind.
 
+## Requirements
 
----
+CheckMate works best with both API keys:
 
-## How it Works
+- **OpenAI API Key**: Required for GPT models (default `quick` verifier)
+- **Anthropic API Key**: Required for Claude models (default `reason` generator)
 
-- You write specs
-- AI implements
-- AI must explain its success with evidence
-- CheckMate uses another AI to verify this reasoning
-- PASS/FAIL verdict shows if your requirements are truly met.
-
-
----
-
-## Quick Start
-
-1. **Install CheckMate:**
-   ```bash
-   npm install @checkmate/cli
-   ```
-
-2. **Initialize with sample spec:**
-   ```bash
-   npx checkmate init
-   ```
-
-3. **Create specs from existing requirements**
-   If you have an existing PRD or requirements document:
-   ```bash
-   npx checkmate warmup docs/requirements.md
-   ```
-   
-   Or create a spec for a new feature:
-   ```bash
-   npx checkmate gen "Feature that allows users to reset their password"
-   ```
-
-4. **Start building with Cursor AI:**
-   
-   Just tell Cursor:
-   ```
-   "Let's use CheckMate to build the password reset feature"
-   ```
-
-5. **Let the AI-driven TDD flow guide development:**
-   
-   - Cursor will analyze each requirement
-   - For each one, it will implement code and provide evidence
-   - CheckMate verifies the reasoning is sound
-   - You get feature implementation with built-in validation
-
-6. **Check status at any time:**
-   ```bash
-   npx checkmate status user-password-reset
-   ```
-
-For more details, see the [Command Reference](#command-reference) below.
-
-### Using with Cursor AI
-
-When working with Cursor AI, you can use natural language to interact with CheckMate:
-
-1. **Start the TDD process for a feature:**
-   
-   Just tell Cursor:
-   ```
-   "Let's use CheckMate to build the password reset feature"
-   ```
-
-2. **What happens next:**
-   
-   CheckMate will show Cursor what needs to be implemented:
-   
-   "I need to verify these requirements for the password reset feature:
-   
-   1. System generates a unique, single-use token
-   2. User receives an email with the reset link
-   3. Clicking the link lets them set a new password
-   4. The token is invalidated after use"
-
-3. **Cursor works through each requirement:**
-   
-   For each requirement, Cursor will:
-   - Think about what success and failure look like
-   - Write or check code to meet the requirement
-   - Show you the evidence it found
-   - Ask CheckMate to verify its reasoning
-
-4. **You can check progress anytime:**
-   
-   Ask Cursor:
-   ```
-   "What's the status of the password reset feature?"
-   ```
-   
-   Or run directly:
-   ```bash
-   checkmate status user-password-reset
-   ```
-
-This conversational TDD workflow ensures Cursor systematically addresses each requirement with logical validation.
-
----
-
-## Common Workflows
-
-### Talking to Cursor AI
-| What you want | What to say to Cursor |
-|---------------|----------------------|
-| **Start TDD for a feature** | "Let's build the password reset feature with CheckMate" |
-| **Check existing code against specs** | "Does this code pass all CheckMate specs?" |
-| **Get help with a failing requirement** | "Why is this requirement failing in CheckMate?" |
-| **Create a spec for a new feature** | "Create a CheckMate spec for a login rate limiter" |
-| **See which specs are affected by my changes** | "What CheckMate specs are affected by these changes?" |
-| **Verify a feature meets its requirements** | "Can you verify the user authentication feature meets all CheckMate requirements?" |
-| **Run specific specs for a feature** | "Test the password reset feature against its CheckMate specs" |
-| **Fix a bug without breaking requirements** | "Fix this bug in the login feature while ensuring all CheckMate specs still pass" |
-| **Create specs for existing code** | "Create CheckMate specs for this existing user profile code" |
-| **Make an enhancement safely** | "Add email notifications to the account feature but make sure all existing CheckMate specs still pass" |
-| **Get help understanding specs** | "Explain what the third requirement in the authentication spec means" |
-| **Review code against specs** | "Does this pull request satisfy all the CheckMate specs for account management?" |
-
-### Using CLI Commands
-| What you want | Command to run |
-|---------------|----------------|
-| **Add a spec for existing code** | `checkmate gen "Description of existing feature"` |
-| **Generate specs from a PRD** | `checkmate warmup docs/PRD.md` |
-| **View all tracked features** | `checkmate features` |
-| **Find specs based on content** | `checkmate find "description of what you're looking for"` |
-| **List checks for a specific feature** | `checkmate list-checks <feature-slug>` |
-| **Manually verify LLM reasoning** | `checkmate verify-llm-reasoning --spec <spec> --check-id <id> --success-condition "..." --failure-condition "..." --outcome-report "..."` |
-| **See which specs your changes affect** | `checkmate affected` |
-| **Get AI help on a failing/unclear check** | `checkmate clarify <spec> --bullet <check-id-or-number>` |
-| **Generate specs for entire repo** | `checkmate warmup` |
-| **View overall status of a spec** | `checkmate status <spec>` |
-| **Reset spec status** | `checkmate reset <spec>` |
-
----
-
-## Environment Variables and Configuration
-
-Add API keys to your `.checkmate` file:
+While you can run with just one key, the recommended configuration uses both:
 
 ```yaml
-# Direct key reference (recommended)
-openai_key: sk-...your-key-here...
-anthropic_key: sk-ant-...your-key-here...
+# In .checkmate file (automatically added to .gitignore)
+openai_key: sk-****      # Your OpenAI API key 
+anthropic_key: sk-ant-**** # Your Anthropic API key
+```
 
-# Model Configuration
+CheckMate uses each model for different purposes:
+- **Claude models** (Anthropic): Primarily used for spec generation and detailed reasoning (`reason`)
+- **GPT models** (OpenAI): Primarily used for quick requirement verification (`quick`)
+
+This dual-model approach ensures:
+1. Higher quality spec generation (Claude excels at reasoning)
+2. Faster verification cycles (GPT models are typically quicker)
+3. Cost optimization (using the right model for each task)
+
+Additional configuration options include:
+
+```yaml
+# Model selection
 models:
-  reason: claude-3-7-sonnet-20250219  # For spec generation
-  quick: gpt-4o-mini                  # For quick requirement checks
+  reason: claude-3-7-sonnet-20250219  # For spec generation (complex reasoning)
+  quick: gpt-4o-mini                  # For requirement verification (faster)
+
+# File discovery
+tree_cmd: "git ls-files | grep -E '\\.(ts|js|tsx|jsx)$'"
+context_top_n: 40  # Top relevant files to include
+
+# Behavior settings
+protect_specs: true  # Detect spec tampering
+auto_fix:
+  max_attempts: 5    # Auto-fix attempts before human intervention
+
+# See wiki/Configuration-Guide.md for complete options
 ```
 
-Or use environment variables:
+For full configuration details, see the [Configuration Guide](wiki/Configuration-Guide.md).
 
-```
-OPENAI_API_KEY=sk-...your-key-here...
-ANTHROPIC_API_KEY=sk-ant-...your-key-here...
-CHECKMATE_MODEL_REASON=claude-3-7-sonnet
-CHECKMATE_MODEL_QUICK=gpt-4o-mini
-```
+### AI Integration and Token Usage
 
----
+CheckMate supports both User Specs (Markdown) and Agent Specs (YAML) that work together to validate your code. Learn more about when to use each in the [Spec Types Guide](wiki/Spec-Types.md).
 
-## Spec Types
+#### AI Operations and Token Usage
 
-| Type | File Format | Created By | Purpose |
-|------|-------------|------------|---------|
-| **User Specs** | `.md` | You or your team | Natural language requirements for humans to write and AI to evaluate |
-| **Agent Specs** | `.yaml` | AI assistants | Specifications that include executable test code |
+CheckMate strategically uses AI for specific operations to balance quality and cost:
 
-**When to use User Specs:**
-- You're new to CheckMate
-- Requirements are simple and easy to understand
-- Non-technical stakeholders need to review specs
+| Operation | Model Used | Token Usage | When It Happens |
+|-----------|------------|-------------|-----------------|
+| **Spec Generation** | `reason` (claude-3-sonnet) | High | Only when you run `gen`, `draft`, or `warmup` commands |
+| **Requirement Verification** | `quick` (gpt-4o-mini) | Medium | During `run` and `verify` operations |
+| **Clarification** | `reason` (claude-3-sonnet) | Medium-High | Only when explicitly using `clarify` command |
 
-**When to use Agent Specs:**
-- You need precise validation with executable tests
-- You want tests that run without AI (e.g., in CI)
-- You're validating complex functionality like API calls
+#### Cost Optimization Features
 
-Convert between types:
+CheckMate includes several features to minimize API costs:
+
+- **Smart Caching**: Results are cached in `.checkmate/cache/` to avoid redundant API calls
+- **File Hashing**: Only re-verifies requirements when files actually change
+- **Selective Execution**: Commands like `affected` only check specs related to changed files
+- **Token Usage Tracking**: Run `checkmate stats` to monitor your API usage and costs
+
+You can also swap models to control costs:
 ```bash
-checkmate promote --to-agent user-auth
+# Use a cheaper model for quick verifications
+checkmate model set quick gpt-3.5-turbo
+
+# Use a more powerful model for spec generation
+checkmate model set reason claude-3-haiku
 ```
 
 ---
 
-## Installation
+## Core Commands
 
-```bash
-npm install checkmateai
-# or
-pnpm add checkmateai
-# or
-yarn add checkmateai
-```
-
-Then initialize CheckMate:
-
-```bash
-npx checkmate init
-```
-
-The init command:
-* Creates a `.checkmate` config in the repo root  
-* Adds `checkmate/` and `.checkmate` to `.gitignore`  
-* Creates rule files in `.cursor/rules/`
-* Sets up the directory structure for specs, logs and cache
+| Command | Description |
+|---------|-------------|
+| `checkmate warmup` | Scan repo, analyze code patterns, and suggest specs |
+| `checkmate gen "<sentence>"` | Create a spec from plain text. |
+| `checkmate gen -i "<sentence>"` | Interactive spec generation with approval workflow. |
+| `checkmate draft "<sentence>"` | Generate spec drafts as JSON without writing to disk. |
+| `checkmate save --json '<json>'` | Save approved spec drafts to disk. |
+| `checkmate run` | Run every check, flip boxes, exit 1 on fail. |
+| `checkmate next` | Run the first unchecked step in the current branch. |
+| `checkmate affected` | Print spec names touched by the current diff. |
+| `checkmate clarify <slug>` | Explain why a requirement is failing and suggest fixes. |
+| `checkmate watch` | Live ASCII dashboard that updates in real-time as specs run. |
+| `checkmate watch --filter todo` | Dashboard filtered to specs containing "todo". |
+| `checkmate watch --spec user-auth --until-pass` | Watch a specific spec until it passes. |
+| `checkmate model set quick gpt-4o-mini` | Swap the model in the config. |
+| `checkmate stats` | Display token usage and estimated costs. |
 
 ---
 
-## Live Dashboard
+## Quick Tips
 
-Run `checkmate watch` to see a live dashboard of your test results:
+Need to...? | Try this:
+------------|----------
+**Create a specification** | `checkmate gen "User can reset their password"`
+**Run all checks** | `checkmate run`
+**Focus on a specific spec** | `checkmate run --target user-password-reset`
+**Monitor progress** | `checkmate watch` (in a separate terminal)
+**Watch a specific feature** | `checkmate watch --spec user-auth --until-pass`
+**Fix failing specs first** | `checkmate watch --status FAIL`
+**See which specs changed** | `checkmate affected`
 
+These commands cover 90% of your daily CheckMate workflow. For more options, use `--help` with any command.
+
+---
+
+## Configuration (`.checkmate`)
+
+```yaml
+openai_key: sk-****
+models:
+  reason: o3
+  quick:  gpt-4o-mini
+tree_cmd: "git ls-files | grep -E '\\.(ts|js|tsx)$'"
+log: optional       # on | off | optional
 ```
-  CheckMate Live Dashboard
 
-Time        Spec                      Type    Total   Status    Pass   Fail    
-────────────────────────────────────────────────────────────────────────────
-08:27:02 PM  test-feature             USER    4       PASS      4      0       
-08:26:56 PM  user-auth-validation     USER    5       FAIL      2      3       
-```
+Change model names any time and commit nothing sensitive.
+
+## Visual Task Indicators in Cursor
+
+CheckMate provides clear visual indicators when tasks are running in Cursor:
+
+![CheckMate Task Indicators](https://via.placeholder.com/600x100?text=CheckMate+Task+Indicators)
+
+Each task type has a distinct visual style:
+
+| Task Type  | Visual Indicator                       | Description                       |
+|------------|---------------------------------------|----------------------------------|
+| pre_task   | 🔍 **SCOPE ANALYSIS** (blue border)   | Analyzes which specs will be affected by changes |
+| post_task  | ✓ **VERIFICATION** (green border)     | Verifies that affected specs pass after changes |
+| post_push  | 🚀 **REGRESSION TEST** (red border)   | Ensures all specs pass before pushing to main |
+
+These visual indicators make it immediately obvious when CheckMate is running tasks in Cursor, providing a seamless and integrated experience.
 
 ---
 
-## Documentation
+## 📜 Cursor Rule Files
 
-For more detailed information about CheckMate, check out these guides:
+In addition to the config-based rules, CheckMate creates `.mdc` rule files in the `.cursor/rules/` directory:
 
-- [Getting Started](wiki/Getting-Started.md) - Installation and setup
-- [Quick Start Guide](wiki/Quick-Start-Guide.md) - Create your first spec
-- [Configuration Guide](wiki/Configuration-Guide.md) - Configure CheckMate
-- [Cursor Integration](wiki/Cursor-Integration.md) - Use CheckMate with Cursor
-- [Advanced Features](wiki/Advanced-Features.md) - Power user features
-- [Spec Types](wiki/Spec-Types.md) - User Specs vs Agent Specs
-- [Development Guide](wiki/Development-Guide.md) - Development workflow and testing
-- [Telemetry Guide](wiki/Telemetry-Guide.md) - Token usage tracking and statistics
 
----
+These rule files improve Cursor's understanding of the CheckMate workflow and provide clear guidance about when and why commands are being executed. They follow Cursor's best practices with short, specific bullets and clear execution steps.
+
+View them in `.cursor/rules/` to understand how CheckMate integrates with your development workflow.
+
+
+
+## Cursor Rules (auto‑injected)
+
+CheckMate automatically injects several rule files into your `.cursor/rules/` directory during initialization:
+
+* `pre_task.mdc` - Analyzes scope and potential impacts before coding begins
+* `post_task.mdc` - Verifies all affected specs and blocks completion until passing
+* `post_push.mdc` - Runs full test suite on pushes to prevent regressions
+* `feature_validation.mdc` - Guides Cursor through the TDD workflow
+* `spec_generation.mdc` - Helps Cursor create and validate new specs
+* `code_review.mdc` - Analyzes changes against existing specs
+* `debug_assist.mdc` - Provides context-aware debugging guidance
+* `refactor_safety.mdc` - Ensures refactoring preserves spec compliance
+
+
+
+
+## Reset and Logs
+
+* After a full‑pass run CheckMate rewrites every `[🟩]` or `[🟥]` back to `[ ]`.  
+* History lives in `checkmate/logs/run.log` unless `log: off`.
+
+Logs stream nicely into your dashboard or CI summary.
+
+## Contributors
+
+<a href="https://github.com/richardsondx/checkmate/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=richardsondx/checkmate" alt="CheckMate project contributors" />
+</a>
+
+
+## Contributing
+
+PRs welcome. Keep each change small and include a spec that proves it works.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
 
 ## License
 
 MIT
+See [LICENSE.md](LICENSE.md) for details.
 
----
-
-## PRD-Driven Workflow
-
-CheckMate supports a PRD-driven workflow:
-
-1. **Warmup** reads a PRD file and bootstraps base specs:
-   ```bash
-   checkmate warmup docs/PRD.md
-   ```
-
-2. **Features** lists the features discovered during that Warmup:
-   ```bash
-   checkmate features
-   ```
-
-3. **Audit** compares an existing spec against the real code to catch drift:
-   ```bash
-   checkmate audit user-login-flow
-   ```
-
-This workflow enables:
-- Direct spec creation from PRD documents
-- Tracking which features from the PRD are implemented
-- Verifying implementation matches the spec with action bullets
-
-```
-Spec: user-login-flow
-──────────────────────────
-✅ validate user credentials
-✅ create user session
-❌ implement password reset  <- spec-only bullet
-⚠️ generate auth token      <- code-only bullet
-```

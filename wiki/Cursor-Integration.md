@@ -97,9 +97,16 @@ The second check for 'profile-picture-upload' is unclear. Can CheckMate clarify 
 
 CheckMate's Cursor integration includes several rules in the `.cursor/rules/` directory:
 
-- `checkmate-feature-validation-workflow.mdc` - Primary TDD workflow
-- `checkmate-spec-creator.mdc` - Helps create new specs
-- `checkmate-spec-fixer.mdc` - Assists in fixing failing checks
+- `checkmate-feature-validation-workflow.mdc` - Primary TDD workflow orchestrator that guides the validation process
+- `checkmate-feature-verification-trigger.mdc` - Detects natural language requests to verify/check/test features and triggers the verification workflow
+- `checkmate-auto-fix-enforce.mdc` - Enforces continuous fix attempts until all checks pass or max attempts are reached
+- `checkmate-spec-creator.mdc` - Helps create new properly formatted specs from templates
+- `checkmate-spec-fixer.mdc` - Assists in fixing failing checks and offers targeted solutions
+- `checkmate-spec-format.mdc` - Ensures proper spec formatting is maintained
+- `checkmate-spec-naming-convention.mdc` - Enforces consistent naming conventions for spec files (using kebab-case)
+- `checkmate-spec-drift.mdc` - Detects when specs drift from implementation
+- `checkmate-spec-drift-on-save.mdc` - Checks for spec drift when files are saved
+- `checkmate-non-interactive.mdc` - Ensures CheckMate commands run in non-interactive mode when executed by Cursor
 
 ## Command Reference for Cursor Integration
 
@@ -127,6 +134,7 @@ You can ask Cursor to use other CheckMate commands:
 -   **Create Spec**: `"Create a CheckMate spec for login rate limiting."` (LLM runs `checkmate gen "..."`)
 -   **Get Status**: `"What's the current status of the 'login-rate-limiting' spec?"` (LLM runs `checkmate status --target login-rate-limiting`)
 -   **Clarify Check**: `"Help me understand check #3 for 'login-rate-limiting'."` (LLM runs `checkmate clarify login-rate-limiting --bullet 3`)
+-   **Verify Feature**: `"Verify that the login-rate-limiting feature works."` (Triggers feature verification workflow)
 
 ## Customizing Cursor Rules
 
@@ -371,14 +379,19 @@ CheckMate integrates with Cursor through several rule files that enhance and aut
 
 | Rule File | Purpose |
 |-----------|---------|
-| `checkmate-non-interactive.mdc` | Makes CheckMate commands run in non-interactive mode when executed through Cursor |
+| `checkmate-feature-validation-workflow.mdc` | Primary TDD workflow orchestrator that guides the validation process |
+| `checkmate-feature-verification-trigger.mdc` | Detects natural language requests to verify/check/test features |
+| `checkmate-auto-fix-enforce.mdc` | Enforces automatic fixing of failing checks until max_attempts is reached |
+| `checkmate-spec-creator.mdc` | Facilitates creation of properly formatted spec files |
+| `checkmate-spec-fixer.mdc` | Helps fix issues in CheckMate spec files |
 | `checkmate-spec-format.mdc` | Ensures proper spec formatting |
+| `checkmate-spec-naming-convention.mdc` | Enforces consistent naming conventions for spec files |
 | `checkmate-spec-drift.mdc` | Detects when specs drift from implementation |
 | `checkmate-spec-drift-on-save.mdc` | Checks for spec drift when files are saved |
+| `checkmate-non-interactive.mdc` | Ensures headless operation of commands |
 | `pre-task.mdc` | Runs before a task starts |
 | `post-task.mdc` | Runs after a task completes |
 | `post-push.mdc` | Runs after pushing changes |
-| `audit-after-fix.md` | Runs audit after fixing code |
 
 ### Command Transformations
 

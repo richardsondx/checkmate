@@ -177,25 +177,6 @@ This provides immediate feedback about what your code does without having to rea
 - You want to check if the implementation matches your mental model
 - You need to create specs for existing functionality
 
-## Hybrid Specifications
-
-You can embed test code directly inside Markdown specs for a hybrid approach:
-
-```markdown
-- [ ] User can create a new todo item
-
-```checkmate
-http POST /api/todos WITH {"title":"test todo"} => 201 AS resp
-assert resp.body.title == "test todo"
-```
-```
-
-Convert a regular Markdown spec to hybrid format:
-
-```bash
-checkmate hybridize --spec user-todo-list
-```
-
 ## Token Usage Tracking and Statistics
 
 CheckMate includes built-in telemetry to track token usage and associated costs across sessions. This helps you monitor AI model usage and estimate expenses.
