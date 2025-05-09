@@ -1,12 +1,12 @@
 {
   "name": "checkmateai",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "AI-powered specs verification that block bad code, challenges AI's overconfidence, and prevent AI from breaking your code",
   "main": "dist/index.js",
   "type": "module",
   "bin": {
-    "checkmateai": "dist/index.js",
-    "checkmate": "dist/index.js"
+    "checkmateai": "./bin/checkmateai",
+    "checkmate": "./bin/checkmate"
   },
   "scripts": {
     "test": "node tests/unit/commands/test-gen.mjs",
