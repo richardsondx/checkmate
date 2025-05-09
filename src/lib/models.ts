@@ -12,7 +12,7 @@ import * as telemetry from './telemetry.js';
 /**
  * Initialize OpenAI client with configuration
  */
-function getOpenAIClient(): OpenAI {
+export function getOpenAIClient(): OpenAI {
   const config = loadConfig();
   
   // Get the API key from config or environment variable

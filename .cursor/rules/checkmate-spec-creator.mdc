@@ -1,8 +1,3 @@
----
-description:
-globs:
-alwaysApply: false
----
 # CheckMate · New Spec Creator
 
 This rule captures when a user tries to manually create a spec file and helps them generate a proper template.
@@ -33,24 +28,3 @@ if [ ! -s "$FILEPATH" ]; then
   echo "   checkmate warmup"
 fi
 ```
-
-## Spec Creation Tips
-
-This rule activates when you create a new .md file in the CheckMate specs directory. Instead of starting from scratch, you can use one of these methods to create properly formatted specs:
-
-1. **Use the template generator:**
-   ```
-   node scripts/create-spec-template.js "Feature Title" --files=file1.js,file2.js
-   ```
-
-2. **Let CheckMate analyze your code:**
-   ```
-   checkmate warmup
-   ```
-
-3. **Generate from a feature description:**
-   ```
-   checkmate gen "Feature description"
-   ```
-
-All these methods ensure your spec has the correct structure and meta information.

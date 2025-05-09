@@ -1,0 +1,8 @@
+{
+  "models": {
+    "reason": "gpt-4o",
+    "quick": "gpt-4o-mini"
+  },
+  "tree_cmd": "git ls-files | grep -E '\\\\.(ts|js|tsx|jsx)$'",
+  "log": "optional"
+} 

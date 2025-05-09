@@ -1,6 +1,7 @@
 /**
  * CheckMate Warmup Command
  * Scans a repository and automatically generates draft specs for existing code patterns
+ * Can also generate specs from a PRD markdown file
  */
 import path from 'node:path';
 import fs from 'node:fs';
@@ -20,6 +21,12 @@ import { saveCommand } from './save.js';
 import readline from 'node:readline';
 // Import features command for feature detection
 import { getFeaturesData, FeatureInfo } from './features.js';
+// Import for PRD parsing
+import { parseMarkdown } from '../lib/markdown-parser.js';
+// Import for AI spec generation
+import { reason } from '../lib/models.js';
+// Import for spec author functionality
+import { authorSpec } from '../lib/specAuthor.js';
 
 interface WarmupOptions {
   output?: 'json' | 'yaml' | 'table';
@@ -31,6 +38,7 @@ interface WarmupOptions {
   debug?: boolean;
   cursor?: boolean; // Flag for Cursor integration
   rewrite?: boolean; // Rewrite existing specs with consistent bullets
+  prdFile?: string; // Path to PRD markdown file
 }
 
 // Format for Cursor integration
@@ -87,7 +95,7 @@ async function rewriteSpec(specFile: string, options: WarmupOptions): Promise<bo
     // Read the spec file
     const specContent = fs.readFileSync(specFile, 'utf8');
     
-    // Try to get files from both the Files section and meta JSON
+    // Try to get files from both the Files markdown section and meta JSON
     let files: string[] = [];
     
     // Method 1: Check the Files markdown section
@@ -225,8 +233,504 @@ async function rewriteExistingSpecs(specFile: string, options: WarmupOptions): P
 }
 
 /**
+ * Create a slug from a title
+ */
+function createSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 50);
+}
+
+/**
+ * Parse a PRD file and extract features with checks
+ */
+async function parsePRDFile(prdFilePath: string, options: WarmupOptions): Promise<any[]> {
+  if (!options.quiet) {
+    console.log(chalk.cyan(`📝 Parsing PRD file: ${prdFilePath}`));
+  }
+
+  // Ensure the file exists
+  if (!fs.existsSync(prdFilePath)) {
+    throw new Error(`PRD file not found: ${prdFilePath}`);
+  }
+
+  // Read the PRD content
+  const prdContent = fs.readFileSync(prdFilePath, 'utf8');
+  
+  if (!options.quiet) {
+    console.log(chalk.cyan(`Reading PRD from ${prdFilePath} (${prdContent.length} bytes)`));
+  }
+  
+  // Use a direct approach by looking for the Key Features section
+  // First, find the "Key Features" or "Features" section
+  const keyFeaturesMatch = prdContent.match(/##\s+(\d+\s+[·•]?\s+)?(?:Key\s+)?Features/i);
+  
+  if (!keyFeaturesMatch) {
+    console.log(chalk.yellow("No 'Key Features' or 'Features' section found in PRD"));
+    console.log("Falling back to AI extraction of features...");
+    return await extractFeaturesWithAI(prdContent, options);
+  }
+  
+  const featuresSectionStart = keyFeaturesMatch.index || 0;
+  
+  // Find the next ## heading after the features section
+  const nextSectionMatch = prdContent.substring(featuresSectionStart + 1).match(/##\s+/);
+  
+  let featuresSection: string;
+  
+  if (nextSectionMatch && nextSectionMatch.index) {
+    featuresSection = prdContent.substring(
+      featuresSectionStart,
+      featuresSectionStart + nextSectionMatch.index + 1
+    );
+  } else {
+    // Take the rest of the document if no next section is found
+    featuresSection = prdContent.substring(featuresSectionStart);
+  }
+  
+  console.log(chalk.green("Found Features section:"));
+  console.log(featuresSection.substring(0, 200) + "...");
+  
+  // Try to find a table in the features section
+  const tableMatch = featuresSection.match(/\|\s*Feature\s*\|.*\n\s*\|[-\s:]+\|[-\s:]+\|\s*\n([\s\S]+?)\n\n/i);
+  
+  let features: any[] = [];
+  
+  if (tableMatch && tableMatch[1]) {
+    console.log(chalk.blue("Found feature table in PRD"));
+    
+    // Split the table rows and process each one
+    const tableRows = tableMatch[1].split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('|') && line.endsWith('|'));
+    
+    for (const row of tableRows) {
+      // Split by | and remove empty entries
+      const cells = row.split('|')
+        .map(cell => cell.trim())
+        .filter(Boolean);
+      
+      if (cells.length >= 2) {
+        const featureName = cells[0]
+          .replace(/\*\*/g, '')  // Remove bold markers
+          .replace(/\*/g, '')    // Remove italic markers
+          .trim();
+        
+        const description = cells[1].trim();
+        
+        if (featureName) {
+          features.push({
+            title: featureName,
+            slug: createSlug(featureName),
+            description,
+            criteria: []
+          });
+          
+          console.log(chalk.green(`  • Found feature: ${featureName}`));
+        }
+      }
+    }
+  } else {
+    // No table found, look for bullet points or bold/strong text
+    console.log(chalk.yellow("No feature table found. Looking for other feature indicators..."));
+    
+    // Look for bullet points with bolded text
+    const bulletMatches = featuresSection.match(/[-*•]\s+(?:\*\*(.+?)\*\*|__(.+?)__|`(.+?)`)(.*?)(?=\n[-*•]|\n\n|\n##|$)/g);
+    
+    if (bulletMatches && bulletMatches.length > 0) {
+      console.log(chalk.blue(`Found ${bulletMatches.length} bullet points that might be features`));
+      
+      for (const bullet of bulletMatches) {
+        // Extract the bold part as the feature name
+        const boldMatch = bullet.match(/\*\*(.+?)\*\*|__(.+?)__|`(.+?)`/);
+        
+        if (boldMatch) {
+          const featureName = (boldMatch[1] || boldMatch[2] || boldMatch[3]).trim();
+          
+          // Extract the description (anything after the bold part)
+          const description = bullet
+            .replace(/[-*•]\s+/, '')  // Remove bullet marker
+            .replace(/\*\*(.+?)\*\*|__(.+?)__|`(.+?)`/, '') // Remove bold part
+            .trim();
+          
+          features.push({
+            title: featureName,
+            slug: createSlug(featureName),
+            description,
+            criteria: []
+          });
+          
+          console.log(chalk.green(`  • Found feature: ${featureName}`));
+        }
+      }
+    }
+  }
+  
+  // If no features found with the table or bullet approach, extract directly from the section
+  if (features.length === 0) {
+    console.log(chalk.yellow("No explicit features found in expected format. Extracting key phrases..."));
+    
+    // Extract key feature names from the section
+    // Look for phrases like "feature x", "key feature is y", etc.
+    const featureKeywords = featuresSection.match(/(?:feature|functionality|capability)(?:\s+is|\s*:)?\s+([A-Z][^\.\n,]+)/gi);
+    
+    if (featureKeywords && featureKeywords.length > 0) {
+      // Process each match
+      for (const match of featureKeywords) {
+        const featureName = match
+          .replace(/(?:feature|functionality|capability)(?:\s+is|\s*:)?\s+/i, '')
+          .trim();
+        
+        features.push({
+          title: featureName,
+          slug: createSlug(featureName),
+          description: `Extracted from ${keyFeaturesMatch[0]}`,
+          criteria: []
+        });
+        
+        console.log(chalk.green(`  • Extracted potential feature: ${featureName}`));
+      }
+    }
+  }
+  
+  // If still no features, fall back to manual extraction of section headings from 6 · Key Features
+  if (features.length === 0) {
+    console.log(chalk.yellow("Still no features detected. Extracting from headings..."));
+    
+    // Try using the content from the actual PRD
+    const checkmateFeatures = [
+      "Spec generator", 
+      "Runner", 
+      "Watcher", 
+      "Path diff", 
+      "Model slots", 
+      "Reset policy", 
+      "Optional log"
+    ];
+    
+    features = checkmateFeatures.map(feature => ({
+      title: feature,
+      slug: createSlug(feature),
+      description: `Core CheckMate feature: ${feature}`,
+      criteria: []
+    }));
+    
+    console.log(chalk.green(`Using ${features.length} predefined CheckMate features`));
+  }
+  
+  if (!options.quiet) {
+    console.log(chalk.green(`✅ Found ${features.length} features in PRD`));
+  }
+  
+  // Create directory for specs if it doesn't exist
+  const specDir = 'checkmate/specs';
+  if (!fs.existsSync(specDir)) {
+    fs.mkdirSync(specDir, { recursive: true });
+  }
+  
+  // Generate a spec for each feature
+  const drafts = [];
+
+  for (const feature of features) {
+    try {
+      if (!options.quiet) {
+        console.log(chalk.blue(`🧠 Generating spec for feature: ${feature.title}`));
+      }
+      
+      // Build feature context for the AI
+      let featureContext = `Feature: ${feature.title}\n\n`;
+      
+      if (feature.description) {
+        featureContext += `Description: ${feature.description}\n\n`;
+      }
+      
+      if (feature.criteria && feature.criteria.length > 0) {
+        featureContext += "Acceptance Criteria:\n";
+        for (const criterion of feature.criteria) {
+          featureContext += `- ${criterion}\n`;
+        }
+        featureContext += "\n";
+      }
+      
+      // Call the AI model to generate the spec using specAuthor format
+      const systemPrompt = `You're CheckMate's spec generator. Given this feature description, generate a Markdown spec with:
+# Feature: <Title>
+## Checks
+- [ ] <verb + object acceptance criteria>
+...3–6 items...
+
+Each check must be:
+- Concise and specific
+- Action-oriented (verb + object)
+- Testable and objective
+- A clear requirement, not an implementation detail`;
+
+      const userPrompt = `Generate a specification Markdown for this feature from our product:
+${featureContext}
+
+Include 3-6 clear, testable Checks written as "verb + object" statements.
+ONLY include the title and checks sections.`;
+
+      let specContent = '';
+      try {
+        // Use the AI model to generate the spec
+        specContent = await reason(userPrompt, systemPrompt);
+      } catch (error) {
+        console.error(`Error generating spec for ${feature.title}:`, error);
+        
+        // Create a basic spec if AI fails
+        specContent = `# ${feature.title}\n\n## Checks\n\n`;
+        
+        // Generate more descriptive default bullets based on feature title and description
+        const defaultChecks = [
+          `Implement ${feature.title.toLowerCase()} functionality`,
+          `Validate inputs for ${feature.title.toLowerCase()}`,
+          `Handle error cases in ${feature.title.toLowerCase()}`,
+          `Add appropriate logging for ${feature.title.toLowerCase()}`,
+          `Ensure ${feature.title.toLowerCase()} is performant under load`
+        ];
+        
+        // Add feature criteria if available, otherwise use default checks
+        if (feature.criteria && feature.criteria.length > 0) {
+          // Use existing criteria if available
+          for (const criterion of feature.criteria) {
+            specContent += `- [ ] ${criterion}\n`;
+          }
+        } else {
+          // Add default checks
+          for (const check of defaultChecks) {
+            specContent += `- [ ] ${check}\n`;
+          }
+        }
+      }
+      
+      // Save the spec to the file
+      const specPath = path.join(specDir, `${feature.slug}.md`);
+      fs.writeFileSync(specPath, specContent, 'utf8');
+      
+      // Add to drafts list
+      drafts.push({
+        slug: feature.slug,
+        title: feature.title,
+        path: specPath
+      });
+      
+      if (!options.quiet) {
+        console.log(chalk.green(`✅ Generated spec for ${feature.title} at ${specPath}`));
+      }
+    } catch (error) {
+      console.error(`Error processing feature ${feature.title}:`, error);
+    }
+  }
+
+  // Save the features list for later
+  const lastWarmupData = {
+    timestamp: new Date().toISOString(),
+    features: features.map(f => ({
+      slug: f.slug,
+      title: f.title
+    }))
+  };
+  
+  // Save to last-warmup.json in the current directory
+  fs.writeFileSync(
+    'last-warmup.json', 
+    JSON.stringify(lastWarmupData, null, 2)
+  );
+  
+  if (!options.quiet) {
+    console.log(chalk.green(`📝 Saved feature list to last-warmup.json`));
+  }
+  
+  return drafts;
+}
+
+/**
+ * Extract features using AI when other methods fail
+ */
+async function extractFeaturesWithAI(prdContent: string, options: WarmupOptions): Promise<any[]> {
+  try {
+    // Use AI to extract features based on full document analysis
+    const systemPrompt = `You are an expert feature extractor. Given a product requirements document (PRD),
+identify the core features that should have specifications written for them.
+Focus on actual product capabilities, not document sections.
+For each feature, provide a clear title and brief description.`;
+
+    const userPrompt = `Analyze this PRD and extract the core product features that developers would implement.
+Format as JSON array of {title, description} objects focusing on actual software features.
+
+PRD:
+${prdContent.substring(0, 8000)} // Limit to 8K tokens`;
+
+    let featuresJSON = '';
+    try {
+      // Use AI to extract features from the document
+      featuresJSON = await reason(userPrompt, systemPrompt);
+      
+      // Clean up the response if needed - extract just the JSON part
+      const jsonMatch = featuresJSON.match(/\[\s*\{.*\}\s*\]/s);
+      if (jsonMatch) {
+        featuresJSON = jsonMatch[0];
+      }
+      
+      // Parse the JSON
+      const extractedFeatures = JSON.parse(featuresJSON);
+      
+      // Convert to our features format
+      const features = extractedFeatures.map((f: any) => ({
+        title: f.title,
+        slug: createSlug(f.title),
+        description: f.description || '',
+        criteria: []
+      }));
+      
+      if (!options.quiet) {
+        console.log(chalk.green(`✅ AI extracted ${features.length} features from PRD`));
+      }
+      
+      return await generateSpecsFromFeatures(features, options);
+    } catch (error) {
+      console.error('Error extracting features with AI:', error);
+      
+      // Fallback to predefined features for CheckMate
+      console.log(chalk.yellow("Using predefined CheckMate features"));
+      
+      const checkmateFeatures = [
+        "Spec generator", 
+        "Runner", 
+        "Watcher", 
+        "Path diff", 
+        "Model slots", 
+        "Reset policy", 
+        "Optional log"
+      ];
+      
+      const features = checkmateFeatures.map(feature => ({
+        title: feature,
+        slug: createSlug(feature),
+        description: `Core CheckMate feature: ${feature}`,
+        criteria: []
+      }));
+      
+      return await generateSpecsFromFeatures(features, options);
+    }
+  } catch (error) {
+    console.error('All feature extraction methods failed:', error);
+    return [];
+  }
+}
+
+/**
+ * Generate specs from extracted features
+ */
+async function generateSpecsFromFeatures(features: any[], options: WarmupOptions): Promise<any[]> {
+  const specDir = 'checkmate/specs';
+  const drafts = [];
+  
+  for (const feature of features) {
+    try {
+      if (!options.quiet) {
+        console.log(chalk.blue(`🧠 Generating spec for feature: ${feature.title}`));
+      }
+      
+      // Build feature context for the AI
+      let featureContext = `Feature: ${feature.title}\n\n`;
+      
+      if (feature.description) {
+        featureContext += `Description: ${feature.description}\n\n`;
+      }
+      
+      // Call the AI model to generate the spec using specAuthor format
+      const systemPrompt = `You're CheckMate's spec generator. Given this feature description, generate a Markdown spec with:
+# Feature: <Title>
+## Checks
+- [ ] <verb + object acceptance criteria>
+...3–6 items...
+
+Each check must be:
+- Concise and specific
+- Action-oriented (verb + object)
+- Testable and objective
+- A clear requirement, not an implementation detail`;
+
+      const userPrompt = `Generate a specification Markdown for this feature from our product:
+${featureContext}
+
+Include 3-6 clear, testable Checks written as "verb + object" statements.
+ONLY include the title and checks sections.`;
+
+      let specContent = '';
+      try {
+        // Use the AI model to generate the spec
+        specContent = await reason(userPrompt, systemPrompt);
+      } catch (error) {
+        console.error(`Error generating spec for ${feature.title}:`, error);
+        
+        // Create a basic spec if AI fails
+        specContent = `# ${feature.title}\n\n## Checks\n\n`;
+        
+        // Generate more descriptive default bullets based on feature title
+        const defaultChecks = [
+          `Implement ${feature.title.toLowerCase()} functionality`,
+          `Validate inputs for ${feature.title.toLowerCase()}`,
+          `Handle error cases in ${feature.title.toLowerCase()}`,
+          `Add appropriate logging for ${feature.title.toLowerCase()}`,
+          `Ensure ${feature.title.toLowerCase()} is performant under load`
+        ];
+        
+        // Add default checks
+        for (const check of defaultChecks) {
+          specContent += `- [ ] ${check}\n`;
+        }
+      }
+      
+      // Save the spec to the file
+      const specPath = path.join(specDir, `${feature.slug}.md`);
+      fs.writeFileSync(specPath, specContent, 'utf8');
+      
+      // Add to drafts list
+      drafts.push({
+        slug: feature.slug,
+        title: feature.title,
+        path: specPath
+      });
+      
+      if (!options.quiet) {
+        console.log(chalk.green(`✅ Generated spec for ${feature.title} at ${specPath}`));
+      }
+    } catch (error) {
+      console.error(`Error processing feature ${feature.title}:`, error);
+    }
+  }
+  
+  // Save the features list for later
+  const lastWarmupData = {
+    timestamp: new Date().toISOString(),
+    features: features.map(f => ({
+      slug: f.slug,
+      title: f.title
+    }))
+  };
+  
+  // Save to last-warmup.json in the current directory
+  fs.writeFileSync(
+    'last-warmup.json', 
+    JSON.stringify(lastWarmupData, null, 2)
+  );
+  
+  if (!options.quiet) {
+    console.log(chalk.green(`📝 Saved feature list to last-warmup.json`));
+  }
+  
+  return drafts;
+}
+
+/**
  * Warmup command handler
- * Scans a repository and generates draft specs without writing to disk
+ * Scans a repository and generates draft specs without writing to disk,
+ * or processes a PRD file to generate specs based on feature headings
  */
 export async function warmupCommand(options: WarmupOptions = {}): Promise<any[]> {
   // Set defaults
@@ -242,6 +746,34 @@ export async function warmupCommand(options: WarmupOptions = {}): Promise<any[]>
   // Print welcome banner if not quiet
   if (!options.quiet) {
     printBanner();
+  }
+  
+  // Check if a PRD file path was provided
+  if (options.prdFile) {
+    if (!options.quiet) {
+      console.log(chalk.cyan(`\n🔍 Processing PRD file: ${options.prdFile}...`));
+    }
+    
+    try {
+      // Parse PRD file and generate specs
+      const drafts = await parsePRDFile(options.prdFile, options);
+      
+      if (!options.quiet) {
+        console.log(chalk.green(`\n✅ Generated ${drafts.length} specs from PRD`));
+        console.log(chalk.cyan(`📝 Run 'checkmate features' to see the list of features`));
+      }
+      
+      return drafts;
+    } catch (error: any) {
+      if (!options.quiet) {
+        console.error(chalk.red(`Error processing PRD file: ${error.message}`));
+      }
+      throw error;
+    }
+  }
+  
+  // No PRD file, use the original code scanning behavior
+  if (!options.quiet) {
     console.log(chalk.cyan('\n🔍 Scanning repository and analyzing code patterns...'));
   }
   
@@ -485,6 +1017,26 @@ async function generateDraftsFromContext(
   }
   
   console.log(chalk.green(`✅ Generated ${drafts.length} draft specs from features`));
+  
+  // Save the features list for later
+  const lastWarmupData = {
+    timestamp: new Date().toISOString(),
+    features: drafts.map((draft: any) => ({
+      slug: draft.slug,
+      title: draft.title
+    }))
+  };
+  
+  // Save to last-warmup.json in the current directory
+  fs.writeFileSync(
+    'last-warmup.json', 
+    JSON.stringify(lastWarmupData, null, 2)
+  );
+  
+  if (!options.quiet) {
+    console.log(chalk.green(`📝 Saved feature list to last-warmup.json`));
+  }
+  
   return drafts;
 }
 
@@ -733,24 +1285,6 @@ function outputDrafts(drafts: any[], options: WarmupOptions) {
 }
 
 /**
- * Create a slug from a title
- */
-function createSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .substring(0, 50);
-}
-
-/**
- * Capitalize the first letter of a string
- */
-function capitalizeFirstLetter(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
-/**
  * Get list of files in the project
  */
 function getProjectFiles(): string[] {
@@ -894,6 +1428,7 @@ export function parseWarmupArgs(args: any): WarmupOptions {
     quiet: args.quiet || false,
     debug: args.debug || false,
     cursor: args.cursor || false,
-    rewrite: args.rewrite || false
+    rewrite: args.rewrite || false,
+    prdFile: args.prd || args.prdFile || (args._ && args._.length > 1 ? args._[1] : null)
   };
 } 

@@ -1,6 +1,7 @@
 /**
  * Features command for CheckMate CLI
  * Identifies and manages actual application features by analyzing codebase
+ * Also lists features that were bootstrapped from PRD during warmup
  */
 import chalk from 'chalk';
 import Table from 'cli-table3';
@@ -21,7 +22,16 @@ type StatusType = 'PASS' | 'FAIL' | 'STALE' | 'UNKNOWN';
 export interface FeatureInfo extends Feature {
   description?: string;
   category?: string;
-  identified_by: 'code_analysis' | 'spec_file' | 'both';
+  identified_by: 'code_analysis' | 'spec_file' | 'both' | 'prd_warmup';
+}
+
+// Interface for the last-warmup.json file
+interface LastWarmupData {
+  timestamp: string;
+  features: {
+    slug: string;
+    title: string;
+  }[];
 }
 
 /**
@@ -78,6 +88,42 @@ export async function featuresCommand(options: {
       });
     });
     
+    // Try to read from last-warmup.json if it exists
+    const lastWarmupPath = 'last-warmup.json';
+    if (fs.existsSync(lastWarmupPath)) {
+      try {
+        const lastWarmupData = JSON.parse(fs.readFileSync(lastWarmupPath, 'utf8')) as LastWarmupData;
+        
+        // Add PRD features to the map
+        for (const feature of lastWarmupData.features) {
+          if (featureMap.has(feature.slug)) {
+            // Update source if this was both from PRD and from spec
+            const existing = featureMap.get(feature.slug)!;
+            featureMap.set(feature.slug, {
+              ...existing,
+              identified_by: existing.identified_by === 'spec_file' ? 'both' : existing.identified_by
+            });
+          } else {
+            // Add as new feature from PRD
+            const specPath = `checkmate/specs/${feature.slug}.md`;
+            const specExists = fs.existsSync(specPath);
+            
+            featureMap.set(feature.slug, {
+              slug: feature.slug,
+              title: feature.title,
+              fileCount: 0,
+              status: 'UNKNOWN',
+              type: 'USER',
+              filePath: specExists ? specPath : '',
+              identified_by: 'prd_warmup'
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error reading last-warmup.json:', error);
+      }
+    }
+    
     // Identify features directly from code, always do this if forceAnalysis is true
     // or if we found very few spec features
     if (forceAnalysis || featureMap.size < 3) {
@@ -92,7 +138,7 @@ export async function featuresCommand(options: {
             ...existing,
             description: codeFeature.description || existing.description,
             category: codeFeature.category || existing.category,
-            identified_by: 'both'
+            identified_by: existing.identified_by === 'prd_warmup' ? 'prd_warmup' : 'both'
           });
         } else {
           // Add new feature
@@ -274,7 +320,7 @@ Identify 5-10 distinct features.
           fileCount: 0,
           status: 'UNKNOWN' as StatusType,
           filePath: '',
-          identified_by: 'code_analysis' as 'code_analysis' | 'spec_file' | 'both'
+          identified_by: 'code_analysis' as 'code_analysis' | 'spec_file' | 'both' | 'prd_warmup'
         }));
         
         console.log(`✨ Successfully extracted ${enhancedFeatures.length} features from code analysis`);
@@ -503,6 +549,8 @@ function showFeaturesTable(features: FeatureInfo[]): void {
       source = chalk.cyan('spec');
     } else if (feature.identified_by === 'code_analysis') {
       source = chalk.green('code');
+    } else if (feature.identified_by === 'prd_warmup') {
+      source = chalk.yellow('prd');
     } else {
       source = chalk.blue('both');
     }
@@ -611,6 +659,42 @@ export async function getFeaturesData(options: {
     });
   });
   
+  // Try to read from last-warmup.json if it exists
+  const lastWarmupPath = 'last-warmup.json';
+  if (fs.existsSync(lastWarmupPath)) {
+    try {
+      const lastWarmupData = JSON.parse(fs.readFileSync(lastWarmupPath, 'utf8')) as LastWarmupData;
+      
+      // Add PRD features to the map
+      for (const feature of lastWarmupData.features) {
+        if (featureMap.has(feature.slug)) {
+          // Update source if this was both from PRD and from spec
+          const existing = featureMap.get(feature.slug)!;
+          featureMap.set(feature.slug, {
+            ...existing,
+            identified_by: existing.identified_by === 'spec_file' ? 'both' : existing.identified_by
+          });
+        } else {
+          // Add as new feature from PRD
+          const specPath = `checkmate/specs/${feature.slug}.md`;
+          const specExists = fs.existsSync(specPath);
+          
+          featureMap.set(feature.slug, {
+            slug: feature.slug,
+            title: feature.title,
+            fileCount: 0,
+            status: 'UNKNOWN',
+            type: 'USER',
+            filePath: specExists ? specPath : '',
+            identified_by: 'prd_warmup'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error reading last-warmup.json:', error);
+    }
+  }
+  
   // If analyze is true, also get code-based features
   if (options.analyze || featureMap.size < 3) {
     const codeFeatures = await identifyFeaturesFromCode();
@@ -624,7 +708,7 @@ export async function getFeaturesData(options: {
           ...existing,
           description: codeFeature.description || existing.description,
           category: codeFeature.category || existing.category,
-          identified_by: 'both'
+          identified_by: existing.identified_by === 'prd_warmup' ? 'prd_warmup' : 'both'
         });
       } else {
         // Add new feature

@@ -7,6 +7,8 @@ import { dirname, join } from 'path';
 import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
+import test from 'ava';
+import sinon from 'sinon';
 
 // Get directory of this script
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -175,4 +177,226 @@ async function runTest() {
 // Run the test
 runTest().then(success => {
   process.exit(success ? 0 : 1);
+});
+
+// Mock dependencies
+const mockClipboard = { write: sinon.stub().resolves() };
+const mockOra = sinon.stub().returns({
+  start: sinon.stub().returnsThis(),
+  succeed: sinon.stub().returnsThis(),
+  fail: sinon.stub().returnsThis(),
+  stop: sinon.stub().returnsThis(),
+  text: ''
+});
+
+// Mock models
+const modelStub = {
+  complete: sinon.stub().resolves(`# User Authentication Flow
+
+## Checks
+- [ ] Implement user signup with email and password
+- [ ] Validate user login credentials
+- [ ] Generate password reset tokens and links
+- [ ] Support OAuth authentication providers
+- [ ] Persist user sessions securely`)
+};
+
+const mockSpecAuthor = {
+  authorSpec: sinon.stub().resolves({ path: 'some/path', slug: 'test-slug' })
+};
+
+test.beforeEach(t => {
+  // Create the test sandbox
+  t.context.sandbox = sinon.createSandbox();
+  
+  // Mock fs.existsSync
+  t.context.existsSync = t.context.sandbox.stub(fs, 'existsSync').returns(true);
+  
+  // Mock fs.mkdirSync
+  t.context.mkdirSync = t.context.sandbox.stub(fs, 'mkdirSync').returns(undefined);
+  
+  // Mock fs.readFileSync
+  t.context.readFileSync = t.context.sandbox.stub(fs, 'readFileSync').returns(`# Sample Feature
+
+## Some content
+
+* Bullet point 1
+* Bullet point 2
+`);
+  
+  // Mock fs.writeFileSync
+  t.context.writeFileSync = t.context.sandbox.stub(fs, 'writeFileSync').returns(undefined);
+  
+  // Mock fs.readdirSync
+  t.context.readdirSync = t.context.sandbox.stub(fs, 'readdirSync').returns(['file1.md', 'file2.md']);
+  
+  // Mock execSync
+  t.context.execSync = t.context.sandbox.stub().returns('file1.js\nfile2.js');
+  
+  // Set up process.stdout.write
+  t.context.stdout = t.context.sandbox.stub(process.stdout, 'write');
+});
+
+test.afterEach(t => {
+  t.context.sandbox.restore();
+});
+
+test('Warmup command should handle repository scanning', async t => {
+  // Import the module to test, but with mocked dependencies
+  const { warmupCommand } = await import('../../../src/commands/warmup.js');
+  
+  // Run warmup command with quiet option
+  const result = await warmupCommand({ quiet: true });
+  
+  // Verify behavior
+  t.true(t.context.existsSync.called, 'Should check for files');
+  t.true(Array.isArray(result), 'Should return an array');
+});
+
+test('Warmup command should handle PRD file processing', async t => {
+  // Import the module to test, but with mocked dependencies
+  const warmupModule = await import('../../../src/commands/warmup.js');
+  
+  // Mock the parseMarkdown function to return a valid AST
+  const mockAst = {
+    valid: true,
+    ast: {
+      children: [
+        { type: 'paragraph', children: [] },
+        { 
+          type: 'heading', 
+          depth: 2, 
+          children: [{ type: 'text', value: 'User Authentication Flow' }] 
+        },
+        {
+          type: 'list',
+          children: [
+            { 
+              type: 'listItem', 
+              children: [
+                { 
+                  type: 'paragraph', 
+                  children: [{ type: 'text', value: 'Allow users to sign up with email and password' }] 
+                }
+              ] 
+            },
+            { 
+              type: 'listItem', 
+              children: [
+                { 
+                  type: 'paragraph', 
+                  children: [{ type: 'text', value: 'Support existing user login with validation' }] 
+                }
+              ] 
+            }
+          ]
+        },
+        { 
+          type: 'heading', 
+          depth: 2, 
+          children: [{ type: 'text', value: 'Task Management' }] 
+        },
+        {
+          type: 'list',
+          children: [
+            { 
+              type: 'listItem', 
+              children: [
+                { 
+                  type: 'paragraph', 
+                  children: [{ type: 'text', value: 'Display tasks in a list' }] 
+                }
+              ] 
+            }
+          ]
+        }
+      ]
+    }
+  };
+  
+  const markdownParserStub = {
+    parseMarkdown: sinon.stub().returns(mockAst)
+  };
+  
+  // Override the imports in the warmup module
+  warmupModule.default = {
+    ...warmupModule.default,
+    parseMarkdown: markdownParserStub.parseMarkdown,
+    reason: sinon.stub().resolves(`# User Authentication Flow
+
+## Checks
+- [ ] Implement user signup with email and password
+- [ ] Validate user login credentials
+- [ ] Generate password reset tokens and links`)
+  };
+  
+  // Run warmup command with PRD file option
+  const result = await warmupModule.warmupCommand({
+    quiet: true,
+    prdFile: 'examples/docs/sample-prd.md'
+  });
+  
+  // Verify behavior
+  t.true(t.context.readFileSync.called, 'Should read PRD file');
+  t.true(t.context.writeFileSync.called, 'Should write spec files');
+  t.true(Array.isArray(result), 'Should return an array of specs');
+});
+
+test('Warmup should create last-warmup.json when processing PRD', async t => {
+  // Import the module to test, but with mocked dependencies
+  const warmupModule = await import('../../../src/commands/warmup.js');
+  
+  // Mock the parseMarkdown function to return a valid AST
+  const mockAst = {
+    valid: true,
+    ast: {
+      children: [
+        { 
+          type: 'heading', 
+          depth: 2, 
+          children: [{ type: 'text', value: 'Feature One' }] 
+        },
+        { 
+          type: 'heading', 
+          depth: 2, 
+          children: [{ type: 'text', value: 'Feature Two' }] 
+        }
+      ]
+    }
+  };
+  
+  const markdownParserStub = {
+    parseMarkdown: sinon.stub().returns(mockAst)
+  };
+  
+  // Override the imports in the warmup module
+  warmupModule.default = {
+    ...warmupModule.default,
+    parseMarkdown: markdownParserStub.parseMarkdown,
+    reason: sinon.stub().resolves(`# Feature
+## Checks
+- [ ] First check
+- [ ] Second check`)
+  };
+  
+  // Run warmup command with PRD file option
+  await warmupModule.warmupCommand({
+    quiet: true,
+    prdFile: 'examples/docs/sample-prd.md'
+  });
+  
+  // Find the call that wrote to .checkmate/last-warmup.json
+  const writeCall = t.context.writeFileSync.getCalls().find(call => 
+    call.args[0] === '.checkmate/last-warmup.json' || 
+    call.args[0].endsWith('/last-warmup.json')
+  );
+  
+  t.truthy(writeCall, 'Should write last-warmup.json file');
+  
+  if (writeCall) {
+    const jsonContent = writeCall.args[1];
+    t.true(jsonContent.includes('"features":'), 'Should include features array');
+    t.true(jsonContent.includes('"slug":'), 'Should include feature slugs');
+    t.true(jsonContent.includes('"title":'), 'Should include feature titles');
+  }
 }); 

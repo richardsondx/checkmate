@@ -1,6 +1,6 @@
 # CheckMate
 
-AI-powered specs that block bad code, and prevent AI from breaking your code.
+AI-powered specs that block bad code, See through hallucination, and prevent AI from breaking your code.
 
 CheckMate is an AI‑Driven TDD tool that writes and runs specs for your code.
 It lives in your repo, validates every change, and keeps specs in sync with your implementation.
@@ -71,7 +71,20 @@ npm install checkmateai
 # Initialize
 npx checkmate init
 
-# Create a spec
+# FROM A PRD:
+# 1. Bootstrap specs from your PRD:
+npx checkmate warmup docs/PRD.md
+
+# 2. Preview what we found:
+npx checkmate features
+
+# 3. Implement your code...
+
+# 4. Audit a single feature:
+npx checkmate audit user-login-flow
+
+# OR MANUAL APPROACH:
+# Create a spec manually
 checkmate gen "A user can add a new todo with title and status"
 
 # Run the checks
@@ -98,7 +111,9 @@ CheckMate resets the boxes, logs the pass, and you move on.
 |-------------|---------|
 | **Create a new feature** | Tell Cursor: "Build a todo list app with CheckMate" |
 | **Add a spec for existing code** | `checkmate gen "List all todos"` |
+| **Generate specs from a PRD** | `checkmate warmup docs/PRD.md` |
 | **View all tracked features** | `checkmate features` |
+| **Audit a feature against code** | `checkmate audit user-auth` |
 | **Find only failing features** | `checkmate features --fail` |
 | **Monitor test progress** | `checkmate watch` (in a separate terminal) |
 | **See which specs your changes affect** | `checkmate affected` |
@@ -214,17 +229,18 @@ When you save code changes, Cursor automatically:
 | Command | Description |
 |---------|-------------|
 | `checkmate warmup` | Scan repo, analyze code patterns, and suggest specs |
+| `checkmate warmup <prd-file>` | Generate specs from a PRD markdown file |
+| `checkmate features` | List all features tracked by CheckMate |
+| `checkmate audit <slug>` | Compare spec against implementation using action bullets |
 | `checkmate gen "<sentence>"` | Create a spec from plain text |
 | `checkmate gen -i "<sentence>"` | Interactive spec generation with approval workflow |
 | `checkmate draft "<sentence>"` | Generate spec drafts without writing to disk |
 | `checkmate save --json '<json>'` | Save approved spec drafts to disk |
-| `checkmate features` | List all features tracked by CheckMate |
 | `checkmate run` | Run every check, exit 1 on fail |
 | `checkmate run --target <slug>` | Run a specific spec |
 | `checkmate next` | Run the first unchecked step in the current branch |
 | `checkmate affected` | Print spec names touched by the current diff |
 | `checkmate clarify <slug>` | Explain why a requirement is failing and suggest fixes |
-| `checkmate audit <slug>` | Compare spec against implementation using action bullets |
 | `checkmate reset <spec-slug>` | Reset the status of a spec back to unchecked state |
 | `checkmate reset --all` | Reset all specs back to unchecked state |
 | `checkmate watch` | Live ASCII dashboard that updates in real-time as specs run |
@@ -235,21 +251,22 @@ When you save code changes, Cursor automatically:
 
 | Command | Options | Description |
 |---------|---------|-------------|
+| `checkmate warmup` | `--prd <file>` | Generate specs from a PRD markdown file |
+| | `--yes` | Skip interactive mode |
+| | `--output yaml\|json` | Choose output format |
 | `checkmate features` | `--json` | Machine-readable features list |
 | | `--search <term>` | Filter features by title/slug |
 | | `--type USER\|AGENT` | Filter by spec type |
 | | `--status PASS\|FAIL\|STALE` | Filter by status |
 | | `--interactive` | Interactive selection mode |
-| `checkmate watch` | `--filter todo` | Dashboard filtered to specs containing "todo" |
-| | `--spec user-auth` | Focus on a specific spec |
-| | `--status FAIL` | Show only failing specs |
-| | `--until-pass` | Watch until spec passes |
 | `checkmate audit` | `--warn-only` | Only warn on differences, don't fail |
 | | `--json` | Output in machine-readable format |
 | | `--debug` | Show metadata and file hashes |
 | | `--force` | Force regeneration of action bullets |
-| `checkmate warmup` | `--yes` | Skip interactive mode |
-| | `--output yaml\|json` | Choose output format |
+| `checkmate watch` | `--filter todo` | Dashboard filtered to specs containing "todo" |
+| | `--spec user-auth` | Focus on a specific spec |
+| | `--status FAIL` | Show only failing specs |
+| | `--until-pass` | Watch until spec passes |
 | `checkmate gen` | `--agent` | Create YAML spec with executable tests |
 | | `--files path/to/file` | Specify files to include |
 | `checkmate promote` | `--to-agent <slug>` | Convert User Spec to Agent Spec |
@@ -395,3 +412,38 @@ Spec: user-auth
 - **Interactive add-to-spec** keeps specs alive without hand-editing
 - **No meta spam** keeps output readable
 - Works for non-devs: they read plain bullets, press y/n, never touch test code
+
+---
+
+## PRD-Driven Workflow
+
+CheckMate now supports a PRD-driven workflow:
+
+1. **Warmup** reads a PRD file and bootstraps base specs:
+   ```bash
+   checkmate warmup docs/PRD.md
+   ```
+
+2. **Features** lists the features discovered during that Warmup:
+   ```bash
+   checkmate features
+   ```
+
+3. **Audit** compares an existing spec against the real code to catch drift:
+   ```bash
+   checkmate audit user-login-flow
+   ```
+
+This workflow enables:
+- Direct spec creation from PRD documents
+- Tracking which features from the PRD are implemented
+- Verifying implementation matches the spec with action bullets
+
+```
+Spec: user-login-flow
+──────────────────────────
+✅ validate user credentials
+✅ create user session
+❌ implement password reset  <- spec-only bullet
+⚠️ generate auth token      <- code-only bullet
+```

@@ -65,33 +65,39 @@ export async function extractActionBullets(
   const config = loadConfig();
   const model = createLanguageModel(config.models?.reason || 'gpt-4o');
   
-  // Create the system prompt
-  const systemPrompt = `You are a senior code analyst specializing in identifying key actions performed by code.
-Extract action bullets from code by following these strict rules:
-1. Use exactly the format: <verb> <object> [<optional qualifier>]
-2. Use lowercase ${IMPERATIVE_MOOD} verbs (e.g., validate, fetch, create)
-3. Keep bullets concise (${MAX_BULLET_LENGTH} words or fewer)
-4. No conjunctions, avoid technical variable names
-5. Focus on WHAT the code does, not HOW it does it
-6. Prioritize functional behaviors over implementation details`;
+  // Create the system prompt - more context-aware and reasoning-focused
+  const systemPrompt = `You are an expert code analyst who deeply understands both code implementation and feature specifications.
+
+Your task is to extract the key functional capabilities of the provided code by analyzing what it actually does, not just the surface-level operations.
+
+Rather than focusing exclusively on verb-noun patterns, think about:
+1. What user-facing capabilities does this code implement?
+2. What system features or business logic does this code handle?
+3. What are the significant operations this code performs within its greater context?
+
+You should use your contextual understanding to identify meaningful functional behaviors that would appear in a feature specification.`;
 
   // Create the combined prompt
   const prompt = `${systemPrompt}
 
-Extract at most ${limit} ACTION BULLETS that describe what this code DOES.
+Analyze the following code and extract ${limit} key functional capabilities.
 
-Follow these rules exactly:
-• Format: ${VERB_OBJECT_FORMAT} (qualifier)  
-• Use ${IMPERATIVE_MOOD}, lowercase
-• Each bullet ≤ ${MAX_BULLET_LENGTH} words
-• No conjunctions, no variable names
-• Filter out trivial actions like ${stopVerbs.join(', ')} unless they're primary functionality
+For each capability:
+- Express it concisely as an action (e.g., "authenticate users" or "validate form submissions")
+- Focus on WHAT the code does for users or the system, not implementation details
+- Consider the full context of what the code is trying to accomplish
+- Prioritize significant behaviors over trivial operations like ${stopVerbs.join(', ')}
+
+The goal is to identify features that would appear in a software specification, so the extracted capabilities should:
+- Represent meaningful functionality that delivers value
+- Be testable against acceptance criteria
+- Reflect the purpose of the code, not just its mechanics
 
 CODE TO ANALYZE:
 ${codeSnippet}
 
-Respond with a JSON array of strings containing ONLY the action bullets. Example:
-["validate user credentials", "generate auth token", "store user data"]
+Respond with a JSON array of strings containing ONLY the extracted capabilities. Example:
+["authenticate user credentials", "validate input formats", "store user preferences"]
 `;
 
   // Call the AI to generate the bullets
@@ -142,14 +148,8 @@ Respond with a JSON array of strings containing ONLY the action bullets. Example
     return normalizedBullets;
   } catch (error) {
     console.error('Error calling model for bullet extraction:', error);
-    // Return some default bullets as fallback if model fails
-    return [
-      "handle user input",
-      "process data",
-      "render components",
-      "manage state",
-      "communicate with api"
-    ];
+    // Fail with a clear error - no fallback
+    throw new Error('Unable to analyze code - AI model access is required for this operation.');
   }
 }
 

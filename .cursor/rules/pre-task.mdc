@@ -1,0 +1,5 @@
+# CheckMate – Scope & Reset
+- Scope analysis  
+  - Execute: checkmate affected --json > .cursor/cm_list.json
+- Reset automatic‑fix counter  
+  - SetEnv: CM_FIX_COUNT=0

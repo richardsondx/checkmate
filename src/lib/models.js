@@ -36,6 +36,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getOpenAIClient = getOpenAIClient;
 exports.callModel = callModel;
 exports.reason = reason;
 exports.quick = quick;
@@ -47,6 +48,7 @@ exports.testModelIntegration = testModelIntegration;
 var openai_1 = require("openai");
 var sdk_1 = require("@anthropic-ai/sdk");
 var config_js_1 = require("./config.js");
+var telemetry = require("./telemetry.js");
 /**
  * Initialize OpenAI client with configuration
  */
@@ -99,29 +101,53 @@ function isAnthropicModel(modelName) {
  */
 function callModel(slot, systemPrompt, userPrompt) {
     return __awaiter(this, void 0, void 0, function () {
-        var config, modelName, temperature;
+        var config, modelName, temperature, startTime, result, usage, response, response, error_1;
         return __generator(this, function (_a) {
-            // Check if we're in a test environment
-            if (process.env.TEST_ENV === 'true') {
-                return [2 /*return*/, mockCallModel(slot, systemPrompt, userPrompt)];
+            switch (_a.label) {
+                case 0:
+                    // Check if we're in a test environment
+                    if (process.env.TEST_ENV === 'true') {
+                        return [2 /*return*/, mockCallModel(slot, systemPrompt, userPrompt)];
+                    }
+                    config = (0, config_js_1.load)();
+                    modelName = config.models[slot];
+                    _a.label = 1;
+                case 1:
+                    _a.trys.push([1, 6, , 7]);
+                    temperature = slot === 'quick' ? 0 : 0.2;
+                    startTime = Date.now();
+                    result = void 0;
+                    usage = void 0;
+                    if (!isAnthropicModel(modelName)) return [3 /*break*/, 3];
+                    return [4 /*yield*/, callAnthropicModel(modelName, systemPrompt, userPrompt, temperature)];
+                case 2:
+                    response = _a.sent();
+                    result = response.text;
+                    usage = telemetry.pickUsage(response.raw);
+                    return [3 /*break*/, 5];
+                case 3: return [4 /*yield*/, callOpenAIModel(modelName, systemPrompt, userPrompt, temperature)];
+                case 4:
+                    response = _a.sent();
+                    result = response.text;
+                    usage = telemetry.pickUsage(response.raw);
+                    _a.label = 5;
+                case 5:
+                    // Record telemetry
+                    telemetry.record({
+                        provider: isAnthropicModel(modelName) ? 'anthropic' : 'openai',
+                        model: modelName,
+                        tokensIn: usage.prompt,
+                        tokensOut: usage.completion,
+                        ms: Date.now() - startTime,
+                        estimated: usage.estimated
+                    });
+                    return [2 /*return*/, result];
+                case 6:
+                    error_1 = _a.sent();
+                    console.error("Error calling ".concat(slot, " model:"), error_1);
+                    throw error_1;
+                case 7: return [2 /*return*/];
             }
-            config = (0, config_js_1.load)();
-            modelName = config.models[slot];
-            try {
-                temperature = slot === 'quick' ? 0 : 0.2;
-                // Use the appropriate API based on the model
-                if (isAnthropicModel(modelName)) {
-                    return [2 /*return*/, callAnthropicModel(modelName, systemPrompt, userPrompt, temperature)];
-                }
-                else {
-                    return [2 /*return*/, callOpenAIModel(modelName, systemPrompt, userPrompt, temperature)];
-                }
-            }
-            catch (error) {
-                console.error("Error calling ".concat(slot, " model:"), error);
-                throw error;
-            }
-            return [2 /*return*/];
         });
     });
 }
@@ -147,7 +173,7 @@ function mockCallModel(slot, systemPrompt, userPrompt) {
  */
 function callOpenAIModel(modelName, systemPrompt, userPrompt, temperature) {
     return __awaiter(this, void 0, void 0, function () {
-        var client, params, response;
+        var client, params, response, text;
         var _a;
         return __generator(this, function (_b) {
             switch (_b.label) {
@@ -172,8 +198,8 @@ function callOpenAIModel(modelName, systemPrompt, userPrompt, temperature) {
                     return [4 /*yield*/, client.chat.completions.create(params)];
                 case 1:
                     response = _b.sent();
-                    // Extract and return the response text
-                    return [2 /*return*/, ((_a = response.choices[0].message.content) === null || _a === void 0 ? void 0 : _a.trim()) || ''];
+                    text = ((_a = response.choices[0].message.content) === null || _a === void 0 ? void 0 : _a.trim()) || '';
+                    return [2 /*return*/, { text: text, raw: response }];
             }
         });
     });
@@ -199,12 +225,12 @@ function callAnthropicModel(modelName, systemPrompt, userPrompt, temperature) {
                         })];
                 case 1:
                     response = _a.sent();
-                    // Extract and return the response text
+                    // Extract the response text
                     // Check the content type before accessing the text property
                     if (response.content && response.content.length > 0) {
                         contentBlock = response.content[0];
                         if (contentBlock.type === 'text') {
-                            return [2 /*return*/, contentBlock.text.trim()];
+                            return [2 /*return*/, { text: contentBlock.text.trim(), raw: response }];
                         }
                     }
                     throw new Error('Unexpected response format from Anthropic API');
@@ -243,7 +269,7 @@ function quick(prompt, systemInstructions) {
  */
 function testModelIntegration() {
     return __awaiter(this, void 0, void 0, function () {
-        var response, error_1;
+        var response, error_2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -259,8 +285,8 @@ function testModelIntegration() {
                     console.log('Model response:', response);
                     return [2 /*return*/, response.includes('TEST_SUCCESS')];
                 case 2:
-                    error_1 = _a.sent();
-                    console.error('Model integration test failed:', error_1);
+                    error_2 = _a.sent();
+                    console.error('Model integration test failed:', error_2);
                     return [2 /*return*/, false];
                 case 3: return [2 /*return*/];
             }

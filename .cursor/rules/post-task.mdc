@@ -1,0 +1,7 @@
+# CheckMate – Verify & Auto‑Fix
+- Execute: node scripts/cm-enforce.js run \
+           --target "$(jq -r '.[]' .cursor/cm_list.json)" \
+           --fail-early
+- Env:
+    CM_MAX_FIXES: 5
+    CM_FIX_COUNT: $CM_FIX_COUNT

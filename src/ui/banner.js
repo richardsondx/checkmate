@@ -17,12 +17,12 @@ var helpText = "\n\uD83C\uDFAF Your specs live in `/checkmate/specs`\n\uD83E\uDD
  * Prints the welcome box and ASCII banner
  */
 function printBanner() {
-    // Print welcome box
-    var boxTop = chalk_1.default.hex('#FFA500')("\u256D\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256E");
-    var welcome = chalk_1.default.hex('#FFA500')("\u2502    \u2726 Welcome to the CheckMate CLI \u2014 AI\u2011Driven TDD \u2726     \u2502");
-    var subtext = chalk_1.default.hex('#FFA500')("\u2502     Keeping your features honest, one \u2705 at a time.      \u2502");
-    var boxBottom = chalk_1.default.hex('#FFA500')("\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256F");
-    console.log([boxTop, welcome, subtext, boxBottom].join('\n'));
+    // Welcome box with chess pattern
+    // Use Unicode white and black square emojis for the chess pattern
+    console.log(chalk_1.default.hex('#FFA500')("\u256D\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256E"));
+    console.log(chalk_1.default.hex('#FFA500')("\u2502    \u2726 Welcome to the CheckMate CLI \u2014 AI\u2011Driven TDD \u2726      \u2502") + "  ⬜⬛");
+    console.log(chalk_1.default.hex('#FFA500')("\u2502     Keeping your features honest, one \u2705 at a time.      \u2502") + "  ⬛⬜");
+    console.log(chalk_1.default.hex('#FFA500')("\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256F"));
     // Print ASCII art logo
     console.log(chalk_1.default.green(asciiArt));
     // Print help text

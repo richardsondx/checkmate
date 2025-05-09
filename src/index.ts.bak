@@ -12,6 +12,7 @@ import { printBanner, printBox } from './ui/banner.js';
 import * as configCommands from './commands/config.js';
 import * as treeCommands from './commands/tree.js';
 import * as genCommands from './commands/gen.js';
+import * as runCommands from './commands/run.js';
 import * as affectedCommands from './commands/affected.js';
 import * as watchCommands from './commands/watch.js';
 import * as createCommands from './commands/create.js';
@@ -26,12 +27,7 @@ import * as draftCommands from './commands/draft.js';
 import * as saveCommands from './commands/save.js';
 import * as autoFilesCommands from './commands/auto-files.js';
 import * as featuresCommands from './commands/features.js';
-import * as statusCommands from './commands/status.js';
-import * as testCommands from './commands/test.js';
-import * as clarifyCommands from './commands/clarify.js';
 import chalk from 'chalk';
-import * as listChecksCommands from './commands/list-checks.js';
-import * as verifyLlmReasoningCommands from './commands/verify-llm-reasoning.js';
 
 // Initialize yargs parser
 const yargsInstance = yargs(hideBin(process.argv));
@@ -418,6 +414,102 @@ yargsInstance
     }
   )
   
+  // USER COMMANDS - Testing & Validation
+  .command(
+    'run',
+    'Run all checks for all specs', 
+    (yargs: Argv) => {
+      return yargs
+        .option('noreset', {
+          describe: 'Don\'t reset requirements after a successful run',
+          type: 'boolean',
+          default: false
+        })
+        .option('target', {
+          describe: 'Run only specific specs (comma-separated names or paths)',
+          type: 'string'
+        })
+        .option('type', {
+          describe: 'Run only specs of a certain type (A or B)',
+          type: 'string',
+          choices: ['A', 'B']
+        })
+        .option('fail-early', {
+          describe: 'Stop execution on the first failing requirement',
+          type: 'boolean',
+          default: false
+        })
+        .option('cursor', {
+          describe: 'Output in machine-readable format for Cursor integration',
+          type: 'boolean',
+          default: false
+        });
+    },
+    async (argv: any) => {
+      const reset = !argv.noreset;
+      
+      await runCommands.runCommand({
+        target: argv.target,
+        reset: reset,
+        all: !argv.target && !argv.type,
+        type: argv.type,
+        failEarly: argv.failEarly || false,
+        cursor: argv.cursor || false
+      });
+    }
+  )
+  .command(
+    'next [spec]',
+    'Run the next unchecked requirement in a spec', 
+    (yargs: Argv) => {
+      return yargs
+        .positional('spec', {
+          describe: 'Spec name or path (defaults to first spec with unchecked items)',
+          type: 'string'
+        });
+    },
+    async (argv: any) => {
+      if (argv.spec) {
+        // Run next for the specified spec
+        const specPath = specs.getSpecByName(argv.spec);
+        
+        if (!specPath) {
+          console.error(`Spec not found: ${argv.spec}`);
+          process.exit(1);
+        }
+        
+        await runCommands.runCommand({ target: argv.spec });
+      } else {
+        // Find the first spec with unchecked requirements
+        const specFiles = specs.listSpecs();
+        
+        if (specFiles.length === 0) {
+          console.log('No spec files found. Generate one with "checkmate gen".');
+          process.exit(0);
+        }
+        
+        let foundUnchecked = false;
+        
+        for (const specFile of specFiles) {
+          const parsedSpec = specs.parseSpec(specFile);
+          const hasUnchecked = parsedSpec.requirements.some(req => !req.status);
+          
+          if (hasUnchecked) {
+            console.log(`Found unchecked requirements in ${path.basename(specFile)}`);
+            await runCommands.runCommand({ target: specFile });
+            foundUnchecked = true;
+            break;
+          }
+        }
+        
+        if (!foundUnchecked) {
+          console.log('No unchecked requirements found in any spec.');
+          process.exit(0);
+        }
+      }
+    }
+  )
+  
   // USER COMMANDS - Monitoring & Analysis
   .command(
     'affected',
@@ -730,7 +822,7 @@ yargsInstance
   
   // USER COMMANDS - Project Analysis
   .command(
-    'warmup [prdFile]',
+    'warmup',
     'Scan a repository and suggest specs for existing code',
     (yargs: Argv) => {
       return yargs
@@ -793,8 +885,8 @@ yargsInstance
     async (argv: any) => {
       const warmupModule = await import('./commands/warmup.js');
       // If prd is provided via option, prefer that over positional arg
-      if (argv.prd && !argv._[1]) {
-        argv._[1] = argv.prd;
+      if (argv.prd && !argv._[0]) {
+        argv._[0] = argv.prd;
       }
       await warmupModule.warmupCommand(warmupModule.parseWarmupArgs(argv));
     }
@@ -869,104 +961,186 @@ yargsInstance
     }
   )
   
-  // LLM-DRIVEN TDD COMMANDS
+  // USER COMMANDS - Implementation Analysis
   .command(
-    'list-checks',
-    'List all check items for a spec', 
+    'audit [spec]',
+    'Compare spec against implementation with smart action bullets',
     (yargs: Argv) => {
       return yargs
-        .option('spec', {
-          describe: 'Spec name or path',
-          type: 'string',
-          demandOption: true
+        .positional('spec', {
+          describe: 'Spec to audit (name or path)',
+          type: 'string'
         })
-        .option('format', {
-          describe: 'Output format',
-          type: 'string',
-          choices: ['json', 'text'],
-          default: 'text'
+        .option('files', {
+          describe: 'Files to analyze (glob patterns allowed)',
+          type: 'array',
+          alias: 'f'
         })
-        .option('cursor', {
-          describe: 'Output in machine-readable format for Cursor integration',
+        .option('json', {
+          describe: 'Output as JSON',
           type: 'boolean',
           default: false
         })
         .option('quiet', {
-          describe: 'Suppress all output (useful for programmatic access)',
+          describe: 'Suppress detailed output',
+          type: 'boolean',
+          default: false,
+          alias: 'q'
+        })
+        .option('debug', {
+          describe: 'Show debug information including file hashes and meta info',
           type: 'boolean',
           default: false
+        })
+        .option('force', {
+          describe: 'Force regeneration of action bullets',
+          type: 'boolean',
+          default: false
+        })
+        .option('warn-only', {
+          describe: 'Only warn on differences, don\'t fail',
+          type: 'boolean',
+          default: false
+        })
+        .option('auto-sync', {
+          describe: 'Automatically add missing bullets to spec',
+          type: 'boolean',
+          default: false
+        })
+        .check((argv) => {
+          // Ensure the positional argument gets assigned as spec when used
+          if (argv._.length > 1 && argv._[1] && !argv.spec && !argv.s) {
+            argv.spec = argv._[1].toString();
+          }
+          
+          if (!argv.spec) {
+            throw new Error('A spec name is required');
+          }
+          return true;
         });
     },
     async (argv: any) => {
-      await listChecksCommands.listChecksCommand({
+      const auditModule = await import('./commands/audit.js');
+      await auditModule.auditCommand({
         spec: argv.spec,
-        format: argv.format,
-        cursor: argv.cursor,
-        quiet: argv.quiet
+        files: argv.files,
+        json: argv.json,
+        quiet: argv.quiet,
+        debug: argv.debug,
+        force: argv.force,
+        warnOnly: argv.warnOnly,
+        autoSync: argv.autoSync
       });
     }
   )
+  
+  // USER COMMANDS - Implementation Analysis (Legacy - will be removed)
   .command(
-    'verify-llm-reasoning',
-    'Verify LLM\'s logical reasoning for a check item', 
+    'outline [spec]',
+    'Legacy: Generate a pseudocode outline of implementation (use audit instead)',
     (yargs: Argv) => {
       return yargs
-        .option('spec', {
-          describe: 'Spec name or path',
-          type: 'string',
-          demandOption: true
-        })
-        .option('check-id', {
-          describe: 'ID of the specific check item to verify',
-          type: 'string',
-          demandOption: true
-        })
-        .option('success-condition', {
-          describe: 'LLM\'s defined success condition',
-          type: 'string',
-          demandOption: true
-        })
-        .option('failure-condition', {
-          describe: 'LLM\'s defined failure condition',
-          type: 'string',
-          demandOption: true
-        })
-        .option('outcome-report', {
-          describe: 'LLM\'s observation/outcome report',
-          type: 'string',
-          demandOption: true
-        })
-        .option('explanation-file', {
-          describe: 'File to write explanation to if verification fails',
+        .positional('spec', {
+          describe: 'Spec to analyze (name or path)',
           type: 'string'
         })
-        .option('debug', {
-          describe: 'Show debug information including prompts',
+        .option('files', {
+          describe: 'Files to analyze (glob patterns allowed)',
+          type: 'array',
+          alias: 'f'
+        })
+        .option('diff', {
+          describe: 'Generate diff report comparing spec with implementation',
+          type: 'boolean',
+          default: true,
+          alias: 'd'
+        })
+        .option('depth', {
+          describe: 'Summarization depth (1-3)',
+          type: 'number',
+          default: 2
+        })
+        .option('format', {
+          describe: 'Output format for diff report',
+          type: 'string',
+          choices: ['json', 'markdown'],
+          default: 'markdown'
+        })
+        .option('auto', {
+          describe: 'Auto-detect spec from current context',
+          type: 'boolean',
+          default: false,
+          alias: 'a'
+        })
+        .option('audit', {
+          describe: 'Treat conflicts as failures in CI/CD',
           type: 'boolean',
           default: false
+        })
+        .option('quiet', {
+          describe: 'Suppress detailed output',
+          type: 'boolean',
+          default: false,
+          alias: 'q'
+        })
+        .option('force', {
+          describe: 'Force regeneration even if outline exists',
+          type: 'boolean',
+          default: false
+        })
+        .check((argv) => {
+          // Ensure the positional argument gets assigned as spec when used
+          if (argv._.length > 1 && argv._[1] && !argv.spec && !argv.s) {
+            argv.spec = argv._[1].toString();
+          }
+          
+          if (!argv.spec && !argv.auto && !argv.files) {
+            throw new Error('Either a spec name, --spec, --auto, or --files is required');
+          }
+          return true;
+        });
+    },
+    async (argv: any) => {
+      console.log(chalk.yellow('⚠️ The outline command is deprecated. Please use `checkmate audit` instead for better results.'));
+      
+      const outlineModule = await import('./commands/outline.js');
+      await outlineModule.outlineCommand({
+        spec: argv.spec,
+        files: argv.files,
+        diff: argv.diff,
+        depth: argv.depth,
+        format: argv.format as 'json' | 'markdown',
+        auto: argv.auto,
+        audit: argv.audit,
+        quiet: argv.quiet,
+        force: argv.force
+      });
+    }
+  )
+  
+  // USER COMMANDS - Spec Editing
+  .command(
+    'edit',
+    'Open a spec file in your preferred editor',
+    (yargs: Argv) => {
+      return yargs
+        .option('target', {
+          describe: 'Spec to edit (name or path)',
+          type: 'string',
+          demandOption: true,
+          alias: 't'
         })
         .option('cursor', {
           describe: 'Output in machine-readable format for Cursor integration',
           type: 'boolean',
           default: false
-        })
-        .option('quiet', {
-          describe: 'Suppress all output (useful for programmatic access)',
-          type: 'boolean',
-          default: false
         });
     },
     async (argv: any) => {
-      await verifyLlmReasoningCommands.verifyLlmReasoningCommand({
-        spec: argv.spec,
-        checkId: argv.checkId,
-        successCondition: argv.successCondition,
-        failureCondition: argv.failureCondition,
-        outcomeReport: argv.outcomeReport,
-        explanationFile: argv.explanationFile,
-        debug: argv.debug,
-        cursor: argv.cursor,
-        quiet: argv.quiet
+      const editModule = await import('./commands/edit.js');
+      await editModule.editCommand({
+        target: argv.target,
+        cursor: argv.cursor || false
       });
     }
   )

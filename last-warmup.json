@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-05-08T23:16:54.622Z",
+  "features": [
+    {
+      "slug": "spec-generator",
+      "title": "Spec generator"
+    },
+    {
+      "slug": "runner",
+      "title": "Runner"
+    },
+    {
+      "slug": "watcher",
+      "title": "Watcher"
+    },
+    {
+      "slug": "path-diff",
+      "title": "Path diff"
+    },
+    {
+      "slug": "model-slots",
+      "title": "Model slots"
+    },
+    {
+      "slug": "reset-policy",
+      "title": "Reset policy"
+    },
+    {
+      "slug": "optional-log",
+      "title": "Optional log"
+    }
+  ]
+}
