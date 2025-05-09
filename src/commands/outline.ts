@@ -13,6 +13,7 @@ import { getSpecByName, parseSpec } from '../lib/specs.js';
 import { getFileContent, getRelevantFiles } from '../lib/files.js';
 import { aiSummarize } from '../lib/ai-client.js';
 import { createTwoColumnMarkdownTable } from '../ui/markdown.js';
+import * as telemetry from '../lib/telemetry.js';
 
 // Directory where implementation outlines are stored
 const IMPLEMENTATIONS_DIR = 'checkmate/implementations';
@@ -33,6 +34,9 @@ interface OutlineCommandOptions {
  * Generate an outline of the current implementation for a spec
  */
 export async function outlineCommand(options: OutlineCommandOptions = {}): Promise<any> {
+  // Start telemetry session
+  telemetry.startSession('outline');
+
   // Print welcome banner
   if (!options.quiet) {
     printCompactBanner('Spec-vs-Reality: Implementation Outline');

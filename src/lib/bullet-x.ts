@@ -4,7 +4,8 @@
  * This module provides consistent bullet extraction across warmup and audit commands
  * to ensure that the AI generates and validates the same types of action bullets.
  */
-import { createLanguageModel } from './modelWrapper.js';
+// import { createLanguageModel } from './modelWrapper.js'; // Remove modelWrapper
+import { callModel } from './models.js'; // Use callModel from models.js
 import { load as loadConfig } from './config.js';
 import * as crypto from 'crypto';
 
@@ -61,11 +62,11 @@ export async function extractActionBullets(
     .map(([file, content]) => `// File: ${file}\n${content}`)
     .join('\n\n');
   
-  // Get the model to use
-  const config = loadConfig();
-  const model = createLanguageModel(config.models?.reason || 'gpt-4o');
+  // Get the model to use (slot will be 'reason')
+  // const config = loadConfig(); // No longer needed directly here for model name
+  // const model = createLanguageModel(config.models?.reason || 'gpt-4o'); // Remove modelWrapper usage
   
-  // Create the system prompt - more context-aware and reasoning-focused
+  // Create the system prompt
   const systemPrompt = `You are an expert code analyst who deeply understands both code implementation and feature specifications.
 
 Your task is to extract the key functional capabilities of the provided code by analyzing what it actually does, not just the surface-level operations.
@@ -75,12 +76,12 @@ Rather than focusing exclusively on verb-noun patterns, think about:
 2. What system features or business logic does this code handle?
 3. What are the significant operations this code performs within its greater context?
 
-You should use your contextual understanding to identify meaningful functional behaviors that would appear in a feature specification.`;
+You should use your contextual understanding to identify meaningful functional behaviors that would appear in a feature specification.
+Respond with a JSON array of strings containing ONLY the extracted capabilities. Example:
+["authenticate user credentials", "validate input formats", "store user preferences"]`;
 
-  // Create the combined prompt
-  const prompt = `${systemPrompt}
-
-Analyze the following code and extract ${limit} key functional capabilities.
+  // Create the user prompt
+  const userPrompt = `Analyze the following code and extract ${limit} key functional capabilities.
 
 For each capability:
 - Express it concisely as an action (e.g., "authenticate users" or "validate form submissions")
@@ -96,16 +97,15 @@ The goal is to identify features that would appear in a software specification, 
 CODE TO ANALYZE:
 ${codeSnippet}
 
-Respond with a JSON array of strings containing ONLY the extracted capabilities. Example:
-["authenticate user credentials", "validate input formats", "store user preferences"]
-`;
+Respond with a JSON array of strings containing ONLY the extracted capabilities.`;
 
-  // Call the AI to generate the bullets
+  // Call the AI to generate the bullets using callModel
   try {
-    const response = await model.complete(prompt, {
-      temperature,
-      max_tokens: 1500,
-    });
+    // const response = await model.complete(prompt, { // Old way
+    //   temperature,
+    //   max_tokens: 1500,
+    // });
+    const response = await callModel('reason', systemPrompt, userPrompt);
   
     // Extract the JSON array from the response
     let rawBullets: string[] = [];

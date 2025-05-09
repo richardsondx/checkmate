@@ -209,17 +209,25 @@ export function getPricing(provider: string, model: string): number {
 /**
  * Get a summary of telemetry data
  * @param filePath Optional specific session file to summarize
+ * @param forceMostRecent Force to fetch the most recent session
  * @returns Usage summary
  */
-export function summary(filePath?: string): UsageSummary {
+export function summary(filePath?: string, forceMostRecent: boolean = false): UsageSummary {
   // If no file is specified and currentFile isn't set, use the most recent file
   let sessionFile = filePath;
-  if (!sessionFile && !currentFile) {
+
+  // Determine if we should fetch the most recent session
+  // This is true if forceMostRecent is set, or if no filePath is given AND
+  // (currentFile is not set OR the current command is 'stats')
+  const shouldFetchMostRecent = forceMostRecent || 
+    (!sessionFile && (!currentFile || (current && current.cmd === 'stats')));
+
+  if (shouldFetchMostRecent) {
     try {
       const folderPath = telemetryFolder || path.join(process.cwd(), '.checkmate-telemetry');
       if (fs.existsSync(folderPath)) {
         // Get the most recent jsonl file
-        const files = fs.readdirSync(folderPath)
+        let files = fs.readdirSync(folderPath)
           .filter(file => file.endsWith('.jsonl'))
           .map(file => ({
             name: file,
@@ -227,8 +235,25 @@ export function summary(filePath?: string): UsageSummary {
           }))
           .sort((a, b) => b.time - a.time);
         
+        // If the current command is 'stats' and we have multiple files,
+        // try to exclude the current 'stats' session file to get the *actual* last work session.
+        if (current && current.cmd === 'stats' && files.length > 1) {
+          const statsSessionFileName = `${current.id}.jsonl`;
+          const filteredFiles = files.filter(file => file.name !== statsSessionFileName);
+          if (filteredFiles.length > 0) {
+            files = filteredFiles; // Use the filtered list if it's not empty
+          }
+        }
+        
         if (files.length > 0) {
           sessionFile = path.join(folderPath, files[0].name);
+        } else if (currentFile && current && current.cmd === 'stats') {
+          // Fallback to the current 'stats' session file if no other files exist at all
+          // (e.g. stats is the very first command run)
+          sessionFile = currentFile;
+        } else {
+          // If no files found and it's not the stats command, or currentFile is not set
+          // then sessionFile remains undefined, and the function will return an empty summary.
         }
       }
     } catch (e) {

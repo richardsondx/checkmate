@@ -12,6 +12,7 @@ import { getSpecByName, parseSpec } from '../lib/specs.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { reason } from '../lib/models.js';
+import * as telemetry from '../lib/telemetry.js';
 
 /**
  * Verify LLM reasoning command
@@ -29,6 +30,9 @@ export async function verifyLlmReasoningCommand(options: {
   quiet?: boolean;
   debug?: boolean;
 } = {}): Promise<any> {
+  // Start telemetry session
+  telemetry.startSession('verify-llm-reasoning');
+
   // Print welcome banner
   if (!options.quiet) {
     printCompactBanner('Verify LLM Reasoning');

@@ -9,6 +9,7 @@ import { callModel } from '../lib/models.js';
 import { printBanner, printBox } from '../ui/banner.js';
 import chalk from 'chalk';
 import { load as loadConfig } from '../lib/config.js';
+import * as telemetry from '../lib/telemetry.js';
 
 function isAnthropicModel(modelName: string): boolean {
   return modelName.toLowerCase().includes('claude');
@@ -26,6 +27,9 @@ export async function testCommand(options: {
   quiet?: boolean,
   json?: boolean
 } = {}): Promise<any> {
+  // Start telemetry session
+  telemetry.startSession('test');
+
   // Print welcome banner
   if (!options.quiet) {
     printBanner();

@@ -7,7 +7,16 @@ import * as path from 'node:path';
 import chalk from 'chalk';
 import { listSpecs } from '../lib/specs.js';
 import { parseSpec } from '../lib/specs.js';
-import { getOpenAI, SpecMatch } from '../lib/openai.js';
+import { callModel } from '../lib/models.js';
+import * as telemetry from '../lib/telemetry.js';
+
+// Define SpecMatch interface if it was previously in openai.js
+interface SpecMatch {
+  path: string;
+  relevance: number;
+  title: string;
+  reason: string;
+}
 
 /**
  * Find a spec by description using AI
@@ -18,6 +27,9 @@ export async function findCommand(options: {
   cursor?: boolean;
   json?: boolean;
 }): Promise<any> {
+  // Start telemetry session
+  telemetry.startSession('find');
+
   try {
     if (!options.query) {
       if (options.cursor) {
@@ -65,29 +77,8 @@ export async function findCommand(options: {
       content: string;
     }[];
 
-    // Use OpenAI to find the best matching specs
-    const openai = await getOpenAI();
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: "You are a tool for analyzing software specifications. Given a query and a list of specs, return the ones most relevant to the query. Focus on semantic meaning rather than just keyword matching."
-        },
-        {
-          role: "user",
-          content: `Find specs that match this description: "${options.query}". 
-          
-Return all relevant matches, ranked by relevance.
-
-Spec files to analyze:
-${validSpecs.map(spec => `
---- ${spec.basename} ---
-${spec.content.substring(0, 500)}... (truncated)
-`).join('\n')}
-
+    // Use callModel to find the best matching specs
+    const systemPrompt = `You are a tool for analyzing software specifications. Given a query and a list of specs, return the ones most relevant to the query. Focus on semantic meaning rather than just keyword matching.
 Return your response as a JSON object with this format:
 {
   "matches": [
@@ -99,16 +90,35 @@ Return your response as a JSON object with this format:
     }
   ]
 }
+Only include specs with relevance > 0.6. Reply ONLY with the JSON object.`;
 
-Only include specs with relevance > 0.6.
-`
-        }
-      ],
-    });
+    const userPrompt = `Find specs that match this description: "${options.query}".
 
-    const result = JSON.parse(completion.choices[0].message.content || '{"matches":[]}') as { matches: SpecMatch[] };
+Spec files to analyze:
+${validSpecs.map(spec => `
+--- ${spec.basename} ---
+${spec.content.substring(0, 500)}... (truncated)
+`).join('\n')}
+
+Return all relevant matches, ranked by relevance, in the specified JSON format.`;
+
+    const modelResponse = await callModel('reason', systemPrompt, userPrompt);
     
-    if (!result.matches || result.matches.length === 0) {
+    let result: { matches: SpecMatch[] } = { matches: [] };
+    try {
+      result = JSON.parse(modelResponse || '{"matches":[]}');
+      if (!result.matches) { // Ensure matches array exists
+        result.matches = [];
+      }
+    } catch (e) {
+      if (!options.quiet) {
+        console.error(chalk.red('❌ Error parsing AI response for spec find:'), e);
+        console.error(chalk.dim('Raw AI Response:'), modelResponse);
+      }
+      // Keep result as { matches: [] } on parse error
+    }
+
+    if (result.matches.length === 0) {
       if (options.cursor) {
         console.error(`[CM-FAIL] No specs found matching "${options.query}"`);
       } else if (!options.quiet) {

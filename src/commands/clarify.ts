@@ -9,9 +9,10 @@ import { printBanner } from '../ui/banner.js';
 import { load as loadConfig } from '../lib/config.js';
 import { reason } from '../lib/models.js';
 import { getSpecByName, parseSpec } from '../lib/specs.js';
+import * as telemetry from '../lib/telemetry.js';
 
 interface ClarifyOptions {
-  slug: string;
+  spec: string;
   bullet?: number;
   format?: 'text' | 'json';
 }
@@ -27,18 +28,21 @@ interface ClarifyResult {
  * Analyzes a failing requirement and suggests a course of action
  */
 export async function clarifyCommand(options: ClarifyOptions): Promise<ClarifyResult> {
+  // Start telemetry session
+  telemetry.startSession('clarify');
+
   // Print welcome banner
   printBanner();
   
   // Load the spec
-  const spinner = ora(`Loading spec "${options.slug}"...`).start();
+  const spinner = ora(`Loading spec "${options.spec}"...`).start();
   
   try {
     // Get the spec content
-    const specPaths = await getSpecByName(options.slug);
+    const specPaths = await getSpecByName(options.spec);
     if (!specPaths || specPaths.length === 0) {
-      spinner.fail(`Spec "${options.slug}" not found`);
-      throw new Error(`Spec "${options.slug}" not found`);
+      spinner.fail(`Spec "${options.spec}" not found`);
+      throw new Error(`Spec "${options.spec}" not found`);
     }
     
     // Use the first matching spec
@@ -179,7 +183,7 @@ Return your answer in a JSON format with these fields:
  */
 export function parseClarifyArgs(args: any): ClarifyOptions {
   return {
-    slug: args.slug || args._[1],
+    spec: args.spec || args.slug || args._[1], // Support both slug and spec for backward compatibility
     bullet: args.bullet ? parseInt(args.bullet, 10) : undefined,
     format: args.json ? 'json' : 'text'
   };

@@ -27,6 +27,7 @@ import { parseMarkdown } from '../lib/markdown-parser.js';
 import { reason } from '../lib/models.js';
 // Import for spec author functionality
 import { authorSpec } from '../lib/specAuthor.js';
+import * as telemetry from '../lib/telemetry.js';
 
 interface WarmupOptions {
   output?: 'json' | 'yaml' | 'table';
@@ -733,6 +734,9 @@ ONLY include the title and checks sections.`;
  * or processes a PRD file to generate specs based on feature headings
  */
 export async function warmupCommand(options: WarmupOptions = {}): Promise<any[]> {
+  // Start telemetry session
+  telemetry.startSession('warmup');
+
   // Set defaults
   options.interactive = options.interactive !== false && !options.yes;
   options.output = options.output || 'yaml';

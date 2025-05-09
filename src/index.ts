@@ -244,20 +244,25 @@ yargsInstance
     }
   )
   .command(
-    'list-checks',
+    'list-checks [spec]',
     'List all check items for a spec', 
     (yargs: Argv) => {
       return yargs
-        .option('spec', {
+        .positional('spec', {
           describe: 'Spec name or path',
+          type: 'string'
+        })
+        .option('spec', {
+          describe: 'Spec name or path (alternative to positional parameter)',
           type: 'string',
-          demandOption: true
+          alias: 's'
         })
         .option('format', {
           describe: 'Output format',
           type: 'string',
           choices: ['json', 'text'],
-          default: 'text'
+          default: 'text',
+          alias: 'f'
         })
         .option('cursor', {
           describe: 'Output in machine-readable format for Cursor integration',
@@ -267,12 +272,22 @@ yargsInstance
         .option('quiet', {
           describe: 'Suppress all output (useful for programmatic access)',
           type: 'boolean',
-          default: false
+          default: false,
+          alias: 'q'
+        })
+        .check((argv) => {
+          // Ensure at least one form of spec is provided
+          if (!argv.spec && !argv._[1]) {
+            throw new Error('Spec name or path is required');
+          }
+          return true;
         });
     },
     async (argv: any) => {
+      // Use positional parameter if provided, otherwise use --spec option
+      const specName = argv._[1] || argv.spec;
       await listChecksCommands.listChecksCommand({
-        spec: argv.spec,
+        spec: specName,
         format: argv.format,
         cursor: argv.cursor,
         quiet: argv.quiet
@@ -287,12 +302,14 @@ yargsInstance
         .option('spec', {
           describe: 'Spec name or path',
           type: 'string',
-          demandOption: true
+          demandOption: true,
+          alias: 's'
         })
         .option('check-id', {
           describe: 'ID of the specific check item to verify',
           type: 'string',
-          demandOption: true
+          demandOption: true,
+          alias: 'c'
         })
         .option('success-condition', {
           describe: 'LLM\'s defined success condition',
@@ -307,16 +324,19 @@ yargsInstance
         .option('outcome-report', {
           describe: 'LLM\'s observation/outcome report',
           type: 'string',
-          demandOption: true
+          demandOption: true,
+          alias: 'o'
         })
         .option('explanation-file', {
           describe: 'File to write explanation to if verification fails',
-          type: 'string'
+          type: 'string',
+          alias: 'e'
         })
         .option('debug', {
           describe: 'Show debug information including prompts',
           type: 'boolean',
-          default: false
+          default: false,
+          alias: 'd'
         })
         .option('cursor', {
           describe: 'Output in machine-readable format for Cursor integration',
@@ -326,7 +346,8 @@ yargsInstance
         .option('quiet', {
           describe: 'Suppress all output (useful for programmatic access)',
           type: 'boolean',
-          default: false
+          default: false,
+          alias: 'q'
         });
     },
     async (argv: any) => {
@@ -408,20 +429,30 @@ yargsInstance
     }
   )
   .command(
-    'status', 
+    'status [spec]', 
     'Check status of a specific spec', 
     (yargs: Argv) => {
       return yargs
-        .option('target', {
-          describe: 'Spec to check status for (name or path)',
+        .positional('spec', {
+          describe: 'Spec name or path',
+          type: 'string'
+        })
+        .option('spec', {
+          describe: 'Spec name or path (alternative to positional parameter)',
           type: 'string',
-          demandOption: true,
-          alias: 't'
+          alias: 's'
+        })
+        .option('target', {
+          describe: 'Spec to check status for (deprecated, use --spec instead)',
+          type: 'string',
+          alias: 't',
+          hidden: true
         })
         .option('json', {
           describe: 'Output as JSON',
           type: 'boolean',
-          default: false
+          default: false,
+          alias: 'j'
         })
         .option('cursor', {
           describe: 'Output in machine-readable format for Cursor integration',
@@ -431,27 +462,37 @@ yargsInstance
         .option('quiet', {
           describe: 'Suppress banner and detailed output',
           type: 'boolean',
-          default: false
+          default: false,
+          alias: 'q'
+        })
+        .check((argv) => {
+          // Ensure at least one form of spec/target is provided
+          if (!argv.spec && !argv.target && !argv._[1]) {
+            throw new Error('Spec name or path is required');
+          }
+          return true;
         });
     }, 
     async (argv: any) => {
       // Import dynamically to avoid circular dependencies
       const statusModule = await import('./commands/status.js');
+      // Use positional parameter, --spec option, or fallback to --target option
+      const specName = argv._[1] || argv.spec || argv.target;
       // Call the status command function explicitly
       await statusModule.statusCommand({ 
-        target: argv.target,
+        target: specName, // Pass as target for backward compatibility with statusCommand
         cursor: argv.cursor || false,
         json: argv.json || false,
         quiet: argv.quiet || false
       });
     })
   .command(
-    'clarify <slug>',
+    'clarify <spec>',
     'Explain why a requirement is failing and suggest fixes',
     (yargs: Argv) => {
       return yargs
-        .positional('slug', {
-          describe: 'Slug of the spec to analyze',
+        .positional('spec', {
+          describe: 'Spec name or path to analyze',
           type: 'string',
           demandOption: true
         })
@@ -462,7 +503,8 @@ yargsInstance
         .option('json', {
           describe: 'Output as JSON',
           type: 'boolean',
-          default: false
+          default: false,
+          alias: 'j'
         });
     },
     async (argv: any) => {
@@ -471,12 +513,12 @@ yargsInstance
     }
   )
   .command(
-    'reset <spec-slug>',
+    'reset <spec>',
     'Reset the status of a spec back to unchecked',
     (yargs: Argv) => {
       return yargs
-        .positional('spec-slug', {
-          describe: 'Slug of the spec to reset',
+        .positional('spec', {
+          describe: 'Spec name or path to reset',
           type: 'string',
           demandOption: true
         });

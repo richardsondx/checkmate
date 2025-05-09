@@ -263,8 +263,8 @@ function displayDetailedBreakdown(): void {
   } else if (argv.all) {
     usageSummary = telemetry.getAllSessionsSummary({});
   } else {
-    // Default to current session
-    usageSummary = telemetry.summary();
+    // Default to current session (interpreted as 'last actual work session')
+    usageSummary = telemetry.summary(undefined, true);
   }
 
   // Display as JSON if requested
