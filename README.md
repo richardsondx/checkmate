@@ -3,9 +3,10 @@
 AI-powered specs that block bad code, See through hallucination, and prevent AI from breaking your code.
 
 CheckMate is an AI‑Driven TDD tool that writes and runs specs for your code.
+
 It lives in your repo, validates every change, and keeps specs in sync with your implementation.
 
-Built with Cursor AI integration in mind, but equally valuable as a standalone TDD tool.
+Built with Cursor AI integration in mind.
 
 ---
 
@@ -127,19 +128,27 @@ This LLM-driven TDD loop ensures your AI assistant systematically works through 
 
 ## Common Workflows
 
-| Want to...? | Do this |
-|-------------|---------|
-| **Start TDD for a new/existing feature** | Tell Cursor: `/@checkmate-tdd <feature-slug>` (or `/checkmate-tdd <feature-slug>`) |
+### Cursor Integration Commands (Use inside Cursor AI)
+| Want to...? | Tell Cursor this |
+|-------------|------------------|
+| **Start TDD for a new/existing feature** | `/@checkmate-tdd <feature-slug>` or `/checkmate-tdd <feature-slug>` |
+| **Run CheckMate against open code** | `/runCheckmate` or `/run-checkmate` |
+| **Get help for a failing requirement** | `/fix-checkmate` |
+
+### CLI Commands (Run in terminal)
+| Want to...? | Run this command |
+|-------------|------------------|
 | **Add a spec for existing code** | `checkmate gen "Description of existing feature"` |
 | **Generate specs from a PRD** | `checkmate warmup docs/PRD.md` |
 | **View all tracked features** | `checkmate features` |
-| **List checks for a specific feature** | `checkmate list-checks --spec <feature-slug>` |
-| **Manually verify LLM reasoning (outside Cursor rule flow)** | `checkmate verify-llm-reasoning --spec <slug> --check-id <id> --success-condition "..." --failure-condition "..." --outcome-report "..."` |
+| **Find specs based on content** | `checkmate find "description of what you're looking for"` |
+| **List checks for a specific feature** | `checkmate list-checks <feature-slug>` |
+| **Manually verify LLM reasoning** | `checkmate verify-llm-reasoning --spec <spec> --check-id <id> --success-condition "..." --failure-condition "..." --outcome-report "..."` |
 | **See which specs your changes affect** | `checkmate affected` |
-| **Get AI help on a failing/unclear check** | `checkmate clarify <feature-slug> --bullet <check-id-or-number>` |
+| **Get AI help on a failing/unclear check** | `checkmate clarify <spec> --bullet <check-id-or-number>` |
 | **Generate specs for entire repo** | `checkmate warmup` |
-| **View overall status of a spec** | `checkmate status --target <feature-slug>` |
-| **Reset spec status** | `checkmate reset <feature-slug>` |
+| **View overall status of a spec** | `checkmate status <spec>` |
+| **Reset spec status** | `checkmate reset <spec>` |
 
 ---
 
@@ -239,8 +248,8 @@ While the TDD rule provides the primary workflow, you can still invoke other Che
 
 | Command | Description |
 |---------|-------------|
-| `checkmate list-checks --spec <slug>` | Lists all check items for a given specification, providing IDs for each. |
-| `checkmate verify-llm-reasoning --spec <slug> --check-id <id> ...` | Validates an LLM's reasoning about a specific check item. Requires success/failure conditions and an outcome report. |
+| `checkmate list-checks <spec>` | Lists all check items for a given specification, providing IDs for each. |
+| `checkmate verify-llm-reasoning --spec <spec> --check-id <id> ...` | Validates an LLM's reasoning about a specific check item. Requires success/failure conditions and an outcome report. |
 | `checkmate gen "<description>"` | Creates a new spec from a plain text description of a feature. |
 | `checkmate warmup [prd-file]` | Scans a repository (or PRD) and suggests/creates specs for existing code or documented features. |
 
@@ -249,10 +258,10 @@ While the TDD rule provides the primary workflow, you can still invoke other Che
 | Command | Description |
 |---------|-------------|
 | `checkmate features` | Lists all features tracked by CheckMate, with their status. |
-| `checkmate status --target <slug>` | Shows the current pass/fail status of all checks for a specific spec. |
-| `checkmate clarify <slug> --bullet <id>` | Asks an AI model to explain why a requirement might be failing or how to implement it, based on the spec and (optionally) relevant code. |
+| `checkmate status <spec>` | Shows the current pass/fail status of all checks for a specific spec. |
+| `checkmate clarify <spec> --bullet <id>` | Asks an AI model to explain why a requirement might be failing or how to implement it, based on the spec and (optionally) relevant code. |
 | `checkmate affected` | Prints spec names touched by the current Git diff (or file snapshot changes). |
-| `checkmate reset <spec-slug>` | Resets the status of all checks in a spec back to unchecked. |
+| `checkmate reset <spec>` | Resets the status of all checks in a spec back to unchecked. |
 | `checkmate model set <tier> <model>` | Configures the AI model for a specific tier (e.g., `reason`, `quick`). |
 | `checkmate stats` | Displays token usage statistics for AI model interactions. |
 
@@ -333,7 +342,7 @@ The init command:
 
 4. **Smoke‑test the specs**
    ```bash
-   checkmate run
+   checkmate status
    ```
 
 5. **Start coding**

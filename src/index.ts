@@ -530,113 +530,41 @@ yargsInstance
   
   // SUPPORTING & UTILITY COMMANDS
   .command(
-    'draft',
-    'Generate draft specifications without writing to disk',
+    'find <query>',
+    'Find specs based on their content using AI',
     (yargs: Argv) => {
       return yargs
-        .option('description', {
-          describe: 'Description of features to generate specs for',
-          type: 'string',
-          demandOption: true,
-          alias: 'd'
-        })
-        .option('context', {
-          describe: 'Number of relevant files to include for context (default: 50)',
-          type: 'number',
-          default: 50
-        })
-        .option('return', {
-          describe: 'Format to return drafts in (md, yaml, both)',
-          type: 'string',
-          choices: ['md', 'yaml', 'both'],
-          default: 'md'
-        })
-        .option('json', {
-          describe: 'Output as JSON (always on for programmatic use)',
-          type: 'boolean',
-          default: true,
-          hidden: true
-        });
-    },
-    async (argv: any) => {
-      const drafts = await draftCommands.draftCommand({
-        description: argv.description,
-        context: argv.context,
-        return: argv.return
-      });
-      
-      // Always output as JSON
-      console.log(draftCommands.formatDraftsAsJson(drafts));
-    }
-  )
-  .command(
-    'save',
-    'Save approved draft specifications to disk',
-    (yargs: Argv) => {
-      return yargs
-        .option('json', {
-          describe: 'JSON draft specifications to save',
+        .positional('query', {
+          describe: 'Description to search for in specs',
           type: 'string',
           demandOption: true
         })
-        .option('format', {
-          describe: 'Format to save specs in (md, yaml, both)',
-          type: 'string',
-          choices: ['md', 'yaml', 'both'],
-          default: 'md'
+        .option('quiet', {
+          describe: 'Suppress detailed output',
+          type: 'boolean',
+          default: false,
+          alias: 'q'
         })
-        .option('force', {
-          describe: 'Save all specs even if not approved',
+        .option('cursor', {
+          describe: 'Output in machine-readable format for Cursor integration',
           type: 'boolean',
           default: false
-        });
-    },
-    async (argv: any) => {
-      const result = await saveCommands.saveCommand({
-        json: argv.json,
-        format: argv.format,
-        force: argv.force
-      });
-      
-      console.log(JSON.stringify(result));
-    }
-  )
-  .command(
-    'create',
-    'Create a spec from JSON payload or PRD file',
-    (yargs: Argv) => {
-      return yargs
+        })
         .option('json', {
-          describe: 'JSON payload with feature description and optional files',
-          type: 'string'
-        })
-        .option('prd', {
-          describe: 'Path to a markdown PRD file to extract features from',
-          type: 'string'
-        })
-        .option('update', {
-          describe: 'Update an existing spec by slug',
-          type: 'string'
-        })
-        .option('agent', {
-          describe: 'Create a YAML agent spec in the agents folder',
+          describe: 'Output as JSON',
           type: 'boolean',
-          default: false
-        })
-        .check((argv) => {
-          const hasOptions = argv.json || argv.prd || argv.update;
-          if (!hasOptions) {
-            throw new Error('One of --json, --prd, or --update is required');
-          }
-          return true;
+          default: false,
+          alias: 'j'
         });
     },
     async (argv: any) => {
-      await createCommands.handleCreate({
-        json: argv.json,
-        prd: argv.prd,
-        update: argv.update,
-        agent: argv.agent
+      // Import dynamically to avoid circular dependencies
+      const findModule = await import('./commands/find.js');
+      await findModule.findCommand({
+        query: argv.query,
+        quiet: argv.quiet || false,
+        cursor: argv.cursor || false,
+        json: argv.json || false
       });
     }
   )

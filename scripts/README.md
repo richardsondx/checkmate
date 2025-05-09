@@ -27,21 +27,20 @@ You have two built-ins:
 
 | What you want                                                                        | Command                                                      | What you'll see                                                             |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| **Quick glance** – pass / fail counts, no execution                                  | `checkmate status --spec cursor-integration`                 | `cursor-integration  ✔ 3 / ✖ 1`                                             |
-| **Full re-run** – execute every bullet, prints CM-PASS/FAIL & exits with proper code | `node scripts/cm-enforce.js run --target cursor-integration` | Same coloured table the shim already shows, plus `[CM-PASS]` or `[CM-FAIL]` |
+| **Quick glance** – pass / fail counts, no execution                                  | `checkmate status <spec>` or `checkmate status --spec <spec>` | `cursor-integration  ✔ 3 / ✖ 1`                                             |
+| **Full re-run** – execute every bullet, prints CM-PASS/FAIL & exits with proper code | `node scripts/cm-enforce.js status <spec>` | Same coloured table the shim already shows, plus `[CM-PASS]` or `[CM-FAIL]` |
 
 #### Flags you can add
 
 ```
 --json            # machine-readable summary
---fail-early      # stop at first red bullet
 --quiet           # suppress banner (good for CI logs)
 ```
 
 Example:
 
 ```bash
-node scripts/cm-enforce.js run --target cursor-integration --fail-early --json
+node scripts/cm-enforce.js status <spec> --json
 ```
 
 returns
@@ -117,10 +116,10 @@ node scripts/spec-snapshot.js diff
 ### TL;DR for Day-to-Day
 
 1. **During a task:**
-   Cursor calls `node scripts/cm-enforce.js run --target "$CM_LIST"` – it will tell you immediately if that spec still fails.
+   Cursor calls `node scripts/cm-enforce.js status "$CM_SPEC"` – it will tell you immediately if that spec still fails.
 
 2. **Ad-hoc check:**
-   `checkmate status --spec your-slug` → quick pass/fail counts.
+   `checkmate status <spec>` → quick pass/fail counts.
 
 3. **Need detail:**
    Re-run via the shim; scroll to the first red bullet; fix code; repeat until `[CM-PASS]`.
