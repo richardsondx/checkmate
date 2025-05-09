@@ -48,35 +48,38 @@ CheckMate uses MCP as a mechanism to interact with large language models for spe
 
 Located in `src/commands/`:
 
-- **run.ts**: Main command execution orchestrator
-- **gen.ts**: Generates new specs from feature descriptions
-- **draft.ts**: Creates spec drafts without writing to disk
-- **save.ts**: Saves reviewed spec drafts to disk
-- **promote.ts**: Promotes user specs to agent specs
-- **status.ts**: Shows status of all specs
-- **watch.ts**: Monitors specs in real-time
-- **create.ts**: Creates specs from external inputs
-- **affected.ts**: Finds specs affected by code changes
-- **initialize.ts**: Sets up the CheckMate environment
+- **list-checks.ts**: Retrieves check items from a specification for the LLM.
+- **verify-llm-reasoning.ts**: Validates the LLM's logical reasoning against its self-defined success/failure conditions and outcome report.
+- **gen.ts**: Generates new specs from feature descriptions.
+- **warmup.ts**: Scans a repository or PRD to suggest/create specs.
+- **features.ts**: Lists all features and their statuses.
+- **status.ts**: Shows the status of checks for a specific spec.
+- **clarify.ts**: Uses AI to explain a check or suggest implementation/fixes.
+- **draft.ts**: Creates spec drafts without writing to disk.
+- **save.ts**: Saves reviewed spec drafts to disk.
+- **promote.ts**: (Role under review) Promotes user specs to agent specs with programmatic tests.
+- **affected.ts**: Finds specs affected by code changes.
+- **initialize.ts**: Sets up the CheckMate environment (as part of `init`).
+- **config.ts**: Manages CheckMate configuration.
+- **Other utility commands**: `watch`, `clean`, `scaffold`, `model`, `snap`, `auto-files`, `test`, `setup-mcp`.
 
 ### 2. Business Logic
 
 Located in `src/lib/`:
 
-- **specs.ts**: Core spec management (parsing, validation, listing)
-- **splitter.ts**: Breaks down complex requirements into atomic features
-- **executor.ts**: Executes tests associated with specs
-- **context.ts**: Builds relevant file context for features
-- **specAuthor.ts**: Generates spec content using AI
-- **models.ts**: Interfaces with AI models
-- **config.ts**: Manages configuration
-- **tree.ts**: Handles file system operations
-- **cursorRules.ts**: Manages integration with Cursor IDE
+- **specs.ts**: Core spec management (parsing, validation, listing, updating check statuses based on `verify-llm-reasoning` outcomes).
+- **splitter.ts**: Breaks down complex requirements into atomic features (used by `warmup` and potentially `gen`).
+- **context.ts**: Builds relevant file context for features (used by `gen`, `warmup`, `clarify`).
+- **specAuthor.ts**: Generates spec content using AI (used by `gen`, `warmup`).
+- **models.ts**: Interfaces with AI models (used by `specAuthor`, `clarify`, and `verify-llm-reasoning`).
+- **config.ts**: Manages configuration.
+- **tree.ts**: Handles file system operations and snapshotting for `affected`.
+- **cursorRules.ts**: Manages integration with Cursor IDE rules, especially the LLM-TDD workflow initiator.
 
 ### 3. Execution Layer
 
-- **test-file.ts**: Orchestrates test execution
-- Test code embedded in agent spec files
+- The primary "execution" in the new TDD workflow is the **LLM itself**, guided by CheckMate commands and Cursor rules.
+- For agent specs (if retained): `executor.ts` and test code embedded in agent spec files.
 
 ### 4. Storage Layer
 
@@ -88,34 +91,72 @@ Located in `src/lib/`:
 
 ## Data Flow
 
-### Spec Creation Flow
+### Spec Creation Flow (Simplified)
 
 ```
-User Request ───▶ Command Processing ───▶ Feature Splitting
-      │                                        │
-      ▼                                        ▼
- Context Building ◀─── File Analysis ◀─── Feature Analysis
+User Request (e.g., `checkmate gen "feature"` or `warmup`)
       │
       ▼
- Spec Generation ───▶ Spec Storage ───▶ Status Update
+Command Processing (`gen.ts`, `warmup.ts`)
+      │
+      ▼
+Feature Splitting (if applicable, `splitter.ts`)
+      │
+      ▼
+Context Building (`context.ts`)
+      │
+      ▼
+Spec Generation (AI via `specAuthor.ts` + `models.ts`)
+      │
+      ▼
+Spec Storage (`checkmate/specs/*.md`)
 ```
 
-### Spec Execution Flow
+### LLM-Driven TDD Workflow
 
 ```
-Run Command ───▶ Spec Loading ───▶ Test Code Preparation
-      │                                   │
-      ▼                                   ▼
- Status Reporting ◀─── Result Collection ◀─── Test Execution
-```
-
-### Promotion Flow
-
-```
-User Spec ───▶ Markdown Parsing ───▶ YAML Generation
-                                           │
-                                           ▼
-                                     Agent Spec Creation
+User/Cursor triggers TDD for <feature-slug> (e.g., /@checkmate-tdd <feature-slug>)
+      │
+      ▼
+Cursor Rule (`checkmate-feature-validation-workflow.mdc`)
+      │
+      ▼
+`checkmate list-checks --spec <feature-slug>` (called by rule)
+      │
+      ▼
+CheckMate (`list-checks.ts`):
+  - Parses spec file (`specs.ts`)
+  - Returns JSON list of checks (text, status, position-based ID)
+      │
+      ▼
+Cursor Rule provides checks and instructions to LLM
+      │
+      ┌──────────────────────────────────────────────────┐
+      │ Loop for each check item:                        │
+      │   1. LLM: Defines Success/Failure Conditions     │
+      │   2. LLM: Implements/Verifies code               │
+      │   3. LLM: Creates Outcome Report                 │
+      │   4. LLM calls:                                  │
+      │      `checkmate verify-llm-reasoning \          `│
+      │         `--spec <slug> --check-id <pos_id> \    `│
+      │         `--success-condition "..." \           `│
+      │         `--failure-condition "..." \           `│
+      │         `--outcome-report "..."`                │
+      │          │                                       │
+      │          ▼                                       │
+      │      CheckMate (`verify-llm-reasoning.ts`):      │
+      │        - Parses spec (`specs.ts`)                │
+      │        - Finds check by <pos_id>                 │
+      │        - Uses AI (`models.ts`) to validate:      │
+      │          (Outcome Report vs SC/FC)               │
+      │        - Updates check status in spec file       │
+      │        - Returns PASS/FAIL + reasoning to LLM    │
+      │          │                                       │
+      │   5. LLM: If FAIL, refines/retries; If PASS, next check │
+      └──────────────────────────────────────────────────┘
+      │
+      ▼
+All checks processed. Optional: `checkmate status --target <feature-slug>`
 ```
 
 ## Key Interfaces
@@ -222,33 +263,33 @@ CheckMate employs a multi-layered testing approach:
 
 ## Common Workflows
 
-### 1. Creating a New Feature
+### 1. LLM-Driven TDD for a Feature
 
 ```
-gen --feature "Feature description" → Create spec → Implement feature → Run tests → Update status
+User in Cursor: /@checkmate-tdd <feature-slug>
+  CheckMate (via rule) -> list-checks
+  LLM -> Implements/Verifies Check 1
+  LLM -> verify-llm-reasoning for Check 1
+  CheckMate -> Validates reasoning, updates spec
+  LLM -> Implements/Verifies Check 2
+  ...
 ```
 
-### 2. Interactive Spec Generation (ISG)
+### 2. Generating Specs (Manual or from PRD)
 
 ```
-draft "Feature description" → Review JSON drafts → Edit as needed → save --json <edited> → Implement feature
+checkmate gen "Feature description" OR checkmate warmup [prd-file]
+  -> Creates/updates spec files in checkmate/specs/
 ```
 
-This workflow separates generation from persistence, allowing for review and refinement before committing to disk.
-
-### 3. Validating Implementation
+### 3. Reviewing Feature Status
 
 ```
-status → Identify failing specs → Run affected specs → Fix issues → Rerun tests
+checkmate features
+checkmate status --target <feature-slug>
 ```
 
-### 4. Continuous Monitoring
-
-```
-watch → Implement features → See real-time pass/fail updates
-```
-
-### 5. Converting User Spec to Agent Spec
+### 4. Converting User Spec to Agent Spec (Role Under Review)
 
 ```
 promote --spec "spec-name" → Edit YAML file → Add test code → Run tests

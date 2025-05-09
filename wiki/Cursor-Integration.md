@@ -1,6 +1,91 @@
-# Cursor Integration
+# Cursor Integration with CheckMate
 
-CheckMate integrates seamlessly with Cursor to provide automated validation during your development workflow. This guide explains how to set up and use CheckMate with Cursor.
+CheckMate is designed for deep integration with AI coding assistants like Cursor, enabling a powerful LLM-driven Test-Driven Development (TDD) workflow.
+
+## Core Concept: LLM-Driven TDD
+
+Instead of CheckMate running tests itself, the LLM (Cursor) drives the verification process. CheckMate acts as a collaborator by:
+1.  **Providing the Checklist**: Giving the LLM the specific requirements (checks) from a spec file.
+2.  **Validating Reasoning**: Checking if the LLM's self-assessment of whether a check passes or fails is logically sound based on the LLM's own criteria and findings.
+
+## Key Commands for Integration
+
+-   `checkmate list-checks --spec <slug>`: Retrieves the checks for a feature, assigning positional IDs (1, 2, 3...). Crucial for feeding the LLM the list of tasks.
+-   `checkmate verify-llm-reasoning --spec <slug> --check-id <id> ...`: The core validation step. The LLM provides its success/failure conditions and outcome report for a check, and CheckMate verifies the logic.
+
+## The Primary Integration Rule: `checkmate-feature-validation-workflow.mdc`
+
+This rule, automatically created in `.cursor/rules/` when you run `checkmate init`, orchestrates the TDD loop within Cursor.
+
+### How it Works:
+
+1.  **Trigger**: You initiate the workflow by telling Cursor to work on a feature using a specific command pattern, typically `/@checkmate-tdd <feature-slug>` or `/checkmate-tdd <feature-slug>`.
+
+2.  **Rule Activation**: The pattern matches, and the `.mdc` rule script executes.
+
+3.  **Check Retrieval**: The script calls `checkmate list-checks --spec <feature-slug> --format json --quiet` to get the checks for the specified feature.
+
+4.  **LLM Instruction**: The script parses the JSON output and presents the list of checks (with their positional IDs) to the LLM (Cursor). It also provides detailed instructions on how the LLM should proceed:
+    *   Iterate through each check ID.
+    *   For each check:
+        *   Define explicit **Success Conditions (SC)**.
+        *   Define explicit **Failure Conditions (FC)**.
+        *   Implement or verify the code related to the check.
+        *   Formulate a concise **Outcome Report (OR)** summarizing the findings.
+        *   Call `checkmate verify-llm-reasoning` with the spec slug, check ID, SC, FC, and OR.
+
+5.  **LLM Execution Loop**: Cursor (the LLM) now takes over, following the instructions:
+    *   It focuses on Check #1.
+    *   Defines SC/FC.
+    *   Writes/reviews code.
+    *   Creates an OR.
+    *   Invokes `checkmate verify-llm-reasoning --spec <slug> --check-id 1 --success-condition "..." ...`.
+
+6.  **Reasoning Validation & Feedback**: CheckMate runs its AI validation:
+    *   If the reasoning is **PASS**: CheckMate updates the spec file (marks check #1 as passed `[x]`) and informs the LLM. The LLM moves to Check #2.
+    *   If the reasoning is **FAIL**: CheckMate updates the spec file (marks check #1 as failed `[✖]`), provides the failure reason from the validation model, and informs the LLM. The LLM uses this feedback to potentially revise its SC/FC, re-evaluate the code, update its OR, and call `verify-llm-reasoning` again for check #1.
+
+7.  **Completion**: The loop continues until all checks for the feature spec have received a PASS from `verify-llm-reasoning`.
+
+## Sample Cursor Prompts for TDD Workflow
+
+**Initiate TDD:**
+
+> `/@checkmate-tdd user-profile-editing`
+
+*(Cursor will then execute the rule, call `list-checks`, and begin the iterative process)*
+
+**Example Interaction (LLM calling CheckMate):**
+
+*(After processing Check #2 for `user-profile-editing`)*
+> ```bash
+> checkmate verify-llm-reasoning --spec user-profile-editing --check-id 2 \
+>   --success-condition "User can update their display name and it persists in the database" \
+>   --failure-condition "Update fails or does not persist" \
+>   --outcome-report "Modified user model save method; test confirmed database update via GET request"
+> ```
+
+**Example CheckMate Feedback to LLM (Failure):**
+
+> `❌ Logical verification FAILED for check "User display name updates persist"`
+> `❌ Reason: The outcome report confirms the save method was modified but does not explicitly confirm the *persistence* was checked via a subsequent read/GET request, only that the update *endpoint* was likely called.`
+
+*(Cursor should now re-evaluate based on the feedback - perhaps by adding a specific database read to its verification step and updating the outcome report).* 
+
+## Other Useful Commands via Cursor
+
+You can ask Cursor to use other CheckMate commands:
+
+-   **List Features**: `"What CheckMate features exist in this project?"` (LLM runs `checkmate features`)
+-   **Create Spec**: `"Create a CheckMate spec for login rate limiting."` (LLM runs `checkmate gen "..."`)
+-   **Get Status**: `"What's the current status of the 'login-rate-limiting' spec?"` (LLM runs `checkmate status --target login-rate-limiting`)
+-   **Clarify Check**: `"Help me understand check #3 for 'login-rate-limiting'."` (LLM runs `checkmate clarify login-rate-limiting --bullet 3`)
+
+## Customizing Cursor Rules
+
+The `.cursor/rules/` directory contains the integration logic. You can customize these `.mdc` files, although the default `checkmate-feature-validation-workflow.mdc` provides the core TDD loop.
+
+Other potential rules might automatically run `checkmate status` after certain commands, but the LLM-TDD workflow is the primary intended integration.
 
 ## Cursor Rules for Automation
 

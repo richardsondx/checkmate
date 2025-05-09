@@ -1,86 +1,113 @@
-# PRD-Driven Workflow
+# PRD-Driven Workflow with LLM-TDD
 
-CheckMate now supports a PRD-driven workflow that streamlines the process of generating and maintaining specs from Product Requirements Documents.
+CheckMate supports a PRD-driven workflow that streamlines the process of generating initial specs from Product Requirements Documents, which then feed into an LLM-driven Test-Driven Development cycle.
 
 ## Overview
 
-The PRD-driven workflow follows these steps:
+The PRD-driven workflow combined with LLM-TDD follows these steps:
 
-1. **Warmup** - Parse a PRD file and bootstrap specs
-2. **Features** - View features discovered from the PRD 
-3. **Audit** - Compare specs against code implementation
+1.  **Warmup**: Parse a PRD file and bootstrap initial Markdown specs for each feature.
+2.  **Features**: View features discovered from the PRD and their current status.
+3.  **LLM-TDD Cycle (Triggered in Cursor)**:
+    *   The user instructs an LLM (e.g., Cursor) to work on a feature (e.g., `/@checkmate-tdd <feature-slug>`).
+    *   A Cursor rule (`checkmate-feature-validation-workflow.mdc`) activates.
+    *   The rule calls `checkmate list-checks --spec <feature-slug>` to get the checklist.
+    *   The LLM receives the checks and instructions to:
+        *   Define success/failure conditions for each check.
+        *   Implement or verify the code for that check.
+        *   Formulate an outcome report.
+        *   Call `checkmate verify-llm-reasoning --spec <slug> --check-id <id> ...` with its conditions and report.
+    *   CheckMate validates the LLM's reasoning and updates the spec file.
+    *   The LLM uses feedback to proceed or self-correct.
+4.  **Status**: Check the overall status of the spec using `checkmate status --target <feature-slug>`.
 
-This workflow enables teams to maintain traceability from product requirements to implementation, ensuring that your code stays aligned with PRD specifications.
+This workflow enables teams to maintain traceability from product requirements to implementation, ensuring that code stays aligned with PRD specifications, with the LLM actively participating in the TDD loop.
 
 ## Usage
 
-### 1. From PRD to Specs
+### 1. From PRD to Initial Specs
 
-To generate specs from your PRD markdown file:
+To generate initial specs from your PRD markdown file:
 
 ```bash
 checkmate warmup docs/PRD.md
 ```
 
 This command:
-- Reads the PRD file and parses all H2 headings as features
-- Extracts bullet lists under each heading as acceptance criteria
-- Calls the AI to generate Markdown specs for each feature
-- Saves specs to `checkmate/specs/<slug>.md`
-- Stores the list of detected features in `.checkmate/last-warmup.json`
+- Reads the PRD file.
+- Uses AI to identify features and their corresponding checks.
+- Generates Markdown specs for each feature in `checkmate/specs/<slug>.md`.
+- Stores the list of detected features in `.checkmate/last-warmup.json`.
 
-Each feature in your PRD becomes a CheckMate spec with a set of testable checks.
+Each feature in your PRD becomes a CheckMate spec with a set of testable checks, ready for the LLM-TDD cycle.
 
 ### 2. View Discovered Features
 
-To see all features extracted from your PRD:
+To see all features extracted from your PRD (and their current status):
 
 ```bash
 checkmate features
 ```
 
-This displays a table with:
-- Feature slugs (derived from H2 headings)
-- Feature titles
-- Feature types (USER/AGENT)
-- Feature status (PASS/FAIL/STALE/UNKNOWN)
-- Source (prd/spec/code/both)
-- File count
+### 3. Initiate LLM-TDD Cycle
 
-### 3. Audit Implementation Against Specs
+In your AI coding assistant (e.g., Cursor), instruct it to start the TDD process for a feature:
 
-Once you've implemented a feature, audit it against its spec:
-
-```bash
-checkmate audit user-login-flow
+```
+/@checkmate-tdd user-authentication-flow
 ```
 
-This command:
-- Finds the spec at `checkmate/specs/user-login-flow.md`
-- Parses all check bullets under the `## Checks` section
-- Extracts action bullets from related code files
-- Compares spec bullets ↔ code bullets and prints:
-  - ✅ Matched criteria (in both spec and code)
-  - ❌ Spec-only bullets (requirements not yet implemented)
-  - ⚠️ Code-only bullets (functionality not in spec)
+This will trigger the `checkmate-feature-validation-workflow.mdc` rule, which guides the LLM through the `list-checks` and `verify-llm-reasoning` cycle for each check in the `user-authentication-flow.md` spec.
 
-The audit command exits with code 0 if all spec requirements are implemented, otherwise 1.
+The LLM will interact with these commands, implement/verify code, and update the spec statuses based on validated reasoning.
+
+### 4. Check Final Status
+
+After the LLM has processed all checks for a feature:
+
+```bash
+checkmate status --target user-authentication-flow
+```
+
+This shows the final pass/fail status of all checks for that spec.
 
 ## PRD Requirements
 
-For best results, structure your PRD with:
+For best results with `checkmate warmup`, structure your PRD with clear feature delineations and acceptance criteria. For example:
 
-1. H2 headings for each feature:
-   ```markdown
-   ## User Authentication Flow
-   ```
+1.  H2 or H3 headings for each feature:
+    ```markdown
+    ## User Authentication Flow
+    ```
 
-2. Bullet lists for acceptance criteria:
-   ```markdown
-   * Allow users to sign up with email and password
-   * Support existing user login with validation
-   * Enable password reset via email link
-   ```
+2.  Bullet lists for acceptance criteria/checks under each feature:
+    ```markdown
+    * Allow users to sign up with email and password.
+    * Support existing user login with validation.
+    * Enable password reset via email link.
+    ```
+
+## Advanced Options
+
+Refer to the main README and command help (`checkmate <command> --help`) for advanced options for `warmup`, `features`, `list-checks`, and `verify-llm-reasoning`.
+
+## Integration with Development Workflow
+
+1.  **Planning Phase**:
+    *   Create or update the PRD for new features.
+    *   Run `checkmate warmup docs/PRD.md` to generate/update initial specs.
+
+2.  **Development Phase (with LLM/Cursor)**:
+    *   For each feature, trigger the TDD workflow: `/@checkmate-tdd <feature-slug>`.
+    *   The LLM iterates through checks, implementing code and using `verify-llm-reasoning`.
+
+3.  **Review Phase**:
+    *   Use `checkmate features` and `checkmate status --target <feature-slug>` to see overall status.
+    *   Ensure all specs are passing before merge.
+
+4.  **Maintenance Phase**:
+    *   When requirements change, update the PRD and the corresponding Markdown spec file(s).
+    *   Re-run the LLM-TDD cycle for affected features if significant changes were made to the spec structure or if `warmup` is used to refresh specs.
 
 ## Example PRD
 

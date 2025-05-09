@@ -212,3 +212,37 @@ For full production deployment, the following issues need to be addressed:
 ✅ --agent flag implemented
 ✅ promote command done
 ✅ README new section added
+
+### 9. LLM-Driven Test-Driven Development (TDD) Workflow
+
+- **Conceptual Shift**: Moved from CheckMate-as-verifier (running its own tests) to CheckMate-as-LLM-collaborator for TDD.
+  - CheckMate now provides the checklist (spec items) and validates the LLM's reasoning about its own verification process.
+
+- **New Core Commands for LLM TDD:**
+  - `list-checks (src/commands/list-checks.ts)`:
+    - Retrieves all check items from a specified spec file.
+    - Assigns a simple, position-based ID (1, 2, 3...) to each check item.
+    - Outputs in JSON (for LLM consumption) or human-readable text.
+  - `verify-llm-reasoning (src/commands/verify-llm-reasoning.ts)`:
+    - Takes a spec, a check ID (position), LLM-defined success/failure conditions, and the LLM's outcome report for that check.
+    - Uses a reasoning model (e.g., GPT-4o) to determine if the LLM's outcome report logically satisfies its own success condition and avoids its failure condition.
+    - Updates the status of the check item (pass/fail) in the Markdown spec file directly.
+    - Provides feedback (PASS/FAIL reason) to the LLM.
+
+- **Command Removals/Deprecations (reflecting new workflow):**
+  - Removed `src/commands/run.ts`: LLM now drives execution; direct spec running by CheckMate is no longer the primary TDD loop.
+  - Removed `src/commands/audit.ts`: `verify-llm-reasoning` + LLM self-assessment replaces the old audit logic.
+
+- **Cursor Rule Enhancement (`.cursor/rules/checkmate-feature-validation-workflow.mdc`):**
+  - Overhauled to orchestrate the new LLM-TDD flow.
+  - When triggered (e.g., by user command `@checkmate-tdd <feature-slug>`):
+    - Calls `list-checks` to get the checklist for the feature.
+    - Presents the checks to the LLM.
+    - Instructs the LLM to iterate through checks, define SC/FC, verify/implement code, create an outcome report, and then call `verify-llm-reasoning`.
+    - The LLM uses feedback from `verify-llm-reasoning` to self-correct or proceed.
+
+- **Spec ID Simplification:**
+  - Moved from complex generated/embedded IDs in spec files to simple 1-based positional IDs for check items. This simplifies parsing and usage by the LLM.
+
+- **Documentation Updates:**
+  - `README.md` and `memory-docs/architectures.md` updated to reflect the new workflow, commands, and data flow.

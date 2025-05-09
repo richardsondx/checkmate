@@ -71,37 +71,57 @@ npm install checkmateai
 # Initialize
 npx checkmate init
 
-# FROM A PRD:
-# 1. Bootstrap specs from your PRD:
-npx checkmate warmup docs/PRD.md
+# Create a spec for a new feature (or use 'checkmate warmup' for existing code)
+checkmate gen "User can reset their password via email link"
 
-# 2. Preview what we found:
-npx checkmate features
+# Let Cursor (or your LLM agent) drive the TDD process:
+# 1. LLM: "Use CheckMate to TDD the 'user-password-reset' feature"
+#    (This triggers the .cursor/rules/checkmate-feature-validation-workflow.mdc rule)
 
-# 3. Implement your code...
+# 2. CheckMate (via rule) to LLM:
+#    "📋 Retrieving check items from spec: checkmate/specs/user-password-reset.md"
+#    "🔍 Found check items to validate:"
+#    "🧪 Check #1: System generates a unique, single-use password reset token"
+#    "🧪 Check #2: User receives an email with a link containing the reset token"
+#    "🧪 Check #3: Clicking the link allows the user to set a new password"
+#    "🧪 Check #4: The reset token is invalidated after use or expiration"
+#    "📝 INSTRUCTIONS FOR CURSOR:"
+#    "---"
+#    "1. For each check item above, you must:"
+#    "   a. Define explicit success and failure conditions"
+#    "   b. Examine the codebase (or write it if it doesn't exist) to verify if it meets your conditions"
+#    "   c. Report your findings as an outcome report"
+#    "   d. Call \`checkmate verify-llm-reasoning\` to validate your reasoning"
+#    "2. Example usage for Check #1:"
+#    "   \`checkmate verify-llm-reasoning --spec user-password-reset --check-id 1 \\"
+#    "      --success-condition \"A cryptographically secure unique token is generated and stored with an expiry.\" \\"
+#    "      --failure-condition \"Token is predictable, not unique, or has no expiry.\" \\"
+#    "      --outcome-report \"Observed UUID v4 generation for token and a 1-hour expiry in token_service.js.\"\`"
+#    "3. Continue until all checks have been verified"
+#    "---"
 
-# 4. Audit a single feature:
-npx checkmate audit user-login-flow
+# 3. LLM implements/verifies code for Check #1, then calls:
+#    checkmate verify-llm-reasoning --spec user-password-reset --check-id 1 ... (as above)
 
-# OR MANUAL APPROACH:
-# Create a spec manually
-checkmate gen "A user can add a new todo with title and status"
+# 4. CheckMate to LLM:
+#    "✅ Logical verification PASSED for check \"System generates a unique, single-use password reset token\""
+#    "✅ Spec \"user-password-reset.md\" has been updated, check marked as [✓]"
 
-# Run the checks
-checkmate run
+# 5. LLM proceeds to Check #2, and so on.
+#    If verify-llm-reasoning fails, the LLM uses the feedback to refine its conditions/outcome or fix the code.
+
+# 6. Finally, check the status:
+checkmate status --target user-password-reset
 ```
 
-CLI output:
+CLI output after all checks pass:
 
 ```
-Feature: add-todo
-  ✔ Reject blank titles
-  ✔ Insert row with done:false
-  ✖ Return 201 JSON payload
+Spec Status: User Password Reset
+✔ 4 / 4 requirements passed (100%)
 ```
 
-Fix the red line, run again, get all green.  
-CheckMate resets the boxes, logs the pass, and you move on.
+This LLM-driven TDD loop ensures your AI assistant systematically works through requirements and self-corrects based on logical validation.
 
 ---
 
@@ -109,19 +129,17 @@ CheckMate resets the boxes, logs the pass, and you move on.
 
 | Want to...? | Do this |
 |-------------|---------|
-| **Create a new feature** | Tell Cursor: "Build a todo list app with CheckMate" |
-| **Add a spec for existing code** | `checkmate gen "List all todos"` |
+| **Start TDD for a new/existing feature** | Tell Cursor: `/@checkmate-tdd <feature-slug>` (or `/checkmate-tdd <feature-slug>`) |
+| **Add a spec for existing code** | `checkmate gen "Description of existing feature"` |
 | **Generate specs from a PRD** | `checkmate warmup docs/PRD.md` |
 | **View all tracked features** | `checkmate features` |
-| **Audit a feature against code** | `checkmate audit user-auth` |
-| **Find only failing features** | `checkmate features --fail` |
-| **Monitor test progress** | `checkmate watch` (in a separate terminal) |
+| **List checks for a specific feature** | `checkmate list-checks --spec <feature-slug>` |
+| **Manually verify LLM reasoning (outside Cursor rule flow)** | `checkmate verify-llm-reasoning --spec <slug> --check-id <id> --success-condition "..." --failure-condition "..." --outcome-report "..."` |
 | **See which specs your changes affect** | `checkmate affected` |
-| **Fix a failing spec** | `checkmate clarify user-auth --bullet 3` |
+| **Get AI help on a failing/unclear check** | `checkmate clarify <feature-slug> --bullet <check-id-or-number>` |
 | **Generate specs for entire repo** | `checkmate warmup` |
-| **Focus on a specific spec** | `checkmate run --target user-auth` |
-| **Watch until a spec passes** | `checkmate watch --spec user-auth --until-pass` |
-| **Reset spec status** | `checkmate reset user-auth` |
+| **View overall status of a spec** | `checkmate status --target <feature-slug>` |
+| **Reset spec status** | `checkmate reset <feature-slug>` |
 
 ---
 
@@ -177,77 +195,68 @@ checkmate promote --to-agent user-auth
 
 ## Cursor Integration & Prompts
 
-### Hardened Cursor Integration
+CheckMate is designed for deep integration with AI coding assistants like Cursor. The primary interaction is through the LLM-driven TDD workflow.
 
-CheckMate includes a robust enforcement mechanism to ensure specs truly pass before Cursor marks a task as complete:
+### Key Integration Rule: `checkmate-feature-validation-workflow.mdc`
 
-```yaml
-# Auto-Fix Configuration (in .checkmate file)
-auto_fix:
-  max_attempts: 5  # Maximum automatic fix attempts before human intervention
-```
+This rule, located in `.cursor/rules/`, is triggered when you ask Cursor to work on a feature using CheckMate (e.g., `/@checkmate-tdd user-login`). It orchestrates the TDD loop:
+1. Calls `checkmate list-checks` to provide the LLM with the checklist for the specified feature.
+2. Instructs the LLM to define success/failure conditions, verify/implement code, and report outcomes for each check.
+3. Guides the LLM to use `checkmate verify-llm-reasoning` after each check to validate its assessment.
 
-Features:
-- **Fail-Fast Mode** - Tests stop at first failure for targeted fixes
-- **Automatic Retry** - System tracks fix attempts to prevent infinite loops
-- **Configurable Retry Budget** - Set max attempts in the `.checkmate` file
-- **Human Intervention** - When max attempts are reached, forces human review
+### Sample Cursor Prompts for the TDD Workflow
 
-### Setting Up MCP
+Initiate TDD for a feature:
+> `/@checkmate-tdd user-authentication`
+> (Cursor will then follow the workflow defined in the rule, interacting with `list-checks` and `verify-llm-reasoning`)
 
-```bash
-npx checkmate setup-mcp
-```
+If a `verify-llm-reasoning` step fails, Cursor might receive feedback like:
+> `❌ Logical verification FAILED for check "Password is hashed using bcrypt"`
+> `❌ Reason: The outcome report states SHA256 was used, which does not meet the success condition of using bcrypt.`
 
-### Sample Cursor Prompts
+Cursor should then use this feedback to correct the implementation or its assessment.
 
-Generate a spec and implement:
-> "Create a user authentication system with login and registration using CheckMate"
+### Other Useful Prompts
 
-Run tests on affected specs:
-> "Implement the user login API and make sure it passes all the CheckMate specs"
+Get a list of features:
+> "What features are tracked by CheckMate?" (LLM might run `checkmate features`)
 
-Fix a failing spec:
-> "The login form spec is failing, fix the code to make it pass"
+Create a new spec:
+> "Create a CheckMate spec for a feature that allows users to upload profile pictures." (LLM might run `checkmate gen "..."`)
 
-Convert user stories to specs:
-> "Convert these user stories into CheckMate specs and implement them"
+Clarify a check:
+> "The second check for 'profile-picture-upload' is unclear. Can CheckMate clarify it?" (LLM might run `checkmate clarify profile-picture-upload --bullet 2`)
 
-### Using CheckMate in Cursor
+### Using CheckMate in Cursor (Beyond the TDD Rule)
 
-When you save code changes, Cursor automatically:
-1. Identifies which specs are affected (`checkmate affected`)
-2. Runs those specs to verify your changes (`checkmate run --target "$specs"`)
-3. Blocks the "Done" badge until all specs pass
+While the TDD rule provides the primary workflow, you can still invoke other CheckMate commands directly or ask the LLM to use them. The `.cursor/rules/` directory contains other rules that might trigger on events like `after_command` (e.g., running `checkmate status` automatically).
 
 ---
 
 ## Detailed Command Reference
 
-### Core Commands
+### Core TDD Workflow Commands
 
 | Command | Description |
 |---------|-------------|
-| `checkmate warmup` | Scan repo, analyze code patterns, and suggest specs |
-| `checkmate warmup <prd-file>` | Generate specs from a PRD markdown file |
-| `checkmate features` | List all features tracked by CheckMate |
-| `checkmate audit <slug>` | Compare spec against implementation using action bullets |
-| `checkmate gen "<sentence>"` | Create a spec from plain text |
-| `checkmate gen -i "<sentence>"` | Interactive spec generation with approval workflow |
-| `checkmate draft "<sentence>"` | Generate spec drafts without writing to disk |
-| `checkmate save --json '<json>'` | Save approved spec drafts to disk |
-| `checkmate run` | Run every check, exit 1 on fail |
-| `checkmate run --target <slug>` | Run a specific spec |
-| `checkmate next` | Run the first unchecked step in the current branch |
-| `checkmate affected` | Print spec names touched by the current diff |
-| `checkmate clarify <slug>` | Explain why a requirement is failing and suggest fixes |
-| `checkmate reset <spec-slug>` | Reset the status of a spec back to unchecked state |
-| `checkmate reset --all` | Reset all specs back to unchecked state |
-| `checkmate watch` | Live ASCII dashboard that updates in real-time as specs run |
-| `checkmate model set <tier> <model>` | Swap the model in the config |
-| `checkmate stats` | Display token usage statistics for the current session |
+| `checkmate list-checks --spec <slug>` | Lists all check items for a given specification, providing IDs for each. |
+| `checkmate verify-llm-reasoning --spec <slug> --check-id <id> ...` | Validates an LLM's reasoning about a specific check item. Requires success/failure conditions and an outcome report. |
+| `checkmate gen "<description>"` | Creates a new spec from a plain text description of a feature. |
+| `checkmate warmup [prd-file]` | Scans a repository (or PRD) and suggests/creates specs for existing code or documented features. |
 
-### Advanced Commands
+### Supporting & Utility Commands
+
+| Command | Description |
+|---------|-------------|
+| `checkmate features` | Lists all features tracked by CheckMate, with their status. |
+| `checkmate status --target <slug>` | Shows the current pass/fail status of all checks for a specific spec. |
+| `checkmate clarify <slug> --bullet <id>` | Asks an AI model to explain why a requirement might be failing or how to implement it, based on the spec and (optionally) relevant code. |
+| `checkmate affected` | Prints spec names touched by the current Git diff (or file snapshot changes). |
+| `checkmate reset <spec-slug>` | Resets the status of all checks in a spec back to unchecked. |
+| `checkmate model set <tier> <model>` | Configures the AI model for a specific tier (e.g., `reason`, `quick`). |
+| `checkmate stats` | Displays token usage statistics for AI model interactions. |
+
+### Advanced & Maintenance Commands
 
 | Command | Options | Description |
 |---------|---------|-------------|
