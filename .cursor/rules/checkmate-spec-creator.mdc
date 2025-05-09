@@ -1,19 +1,7 @@
----
-description: Facilitates creation of CheckMate specification files from natural language descriptions. Use when asked to create specs for new features.
-type: "Agent Requested"
-globs: 
-alwaysApply: false
----
-# CheckMate · New Spec Creator
-
-This rule captures when a user tries to manually create a spec file and helps them generate a proper template.
-
-```rule type=activation
 activationTrigger:
   event: file_create
   path: "checkmate/specs/**.md"
   maxRuns: 1
-```
 
 ```rule type=on_file_create
 # If this is a new file, offer to generate a template

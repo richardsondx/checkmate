@@ -1,14 +1,3 @@
-/*
-# CheckMate Feature Validation Workflow
-
-This rule enforces a standard workflow when asked to use CheckMate to validate that a feature is working correctly.
-*/
-/*
-# CheckMate Feature Validation Workflow
-
-This rule enforces a standard workflow when asked to use CheckMate to validate that a feature is working correctly.
-*/
-
 const workflowRule = {
   name: "CheckMate Feature Validation Workflow",
   description: "Enforce a consistent process for validating features with CheckMate",
@@ -18,8 +7,8 @@ const workflowRule = {
       "1. Check if a spec exists for the feature being validated",
       "2. If no spec exists, suggest creating one and wait for user confirmation",
       "3. Create the spec in checkmate/specs/ directory (NOT in root)",
-      "4. Use the verify-llm-reasoning command to verify implementation against spec checks",
-      "5. If verification fails, attempt fixes until reaching max_attempts (from .checkmate)",
+      "4. Use the audit command to verify implementation against spec",
+      "5. If audit fails, attempt fixes until reaching max_attempts (from .checkmate)",
       "6. Report final status with detailed breakdown of passing and failing checks"
     ];
 
@@ -32,10 +21,10 @@ const workflowRule = {
 
     // Auto-fix enforcement rules
     const autoFixRules = [
-      "- When a feature verification FAILS, ALWAYS continue fixing until max_attempts is reached",
+      "- When a feature validation FAILS, ALWAYS continue fixing until max_attempts is reached",
       "- Track fix attempts with a counter and continue until max_attempts (5 by default)",
       "- Each fix attempt should address specific failing checks with targeted changes",
-      "- After each fix attempt, rerun verify-llm-reasoning to check if the check now passes",
+      "- After each fix attempt, rerun audit to check if all checks now pass",
       "- Only stop fixing when either all checks PASS or max_attempts is reached"
     ];
 

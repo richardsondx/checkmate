@@ -1,9 +1,3 @@
----
-description: Helps fix issues in CheckMate spec files, including formatting and content problems. Use when specs need correction or standardization.
-type: "Agent Requested"
-globs: 
-alwaysApply: false
----
 # CheckMate · Spec Format Auto-Fixer
 
 This rule automatically fixes CheckMate spec files that don't meet format standards.

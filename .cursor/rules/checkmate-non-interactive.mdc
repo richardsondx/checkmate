@@ -1,9 +1,3 @@
----
-description: Handles running CheckMate operations in non-interactive environments. Use for CI/CD scenarios or batch processing where user input isn't available.
-type: "Agent Requested"
-globs: 
-alwaysApply: false
----
 # CheckMate · Non‑Interactive Transform
 - CommandTransform:
     Pattern: '(checkmate\s+\w+)(\s|$)'
