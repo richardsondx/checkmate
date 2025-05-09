@@ -1,15 +1,12 @@
 {
-  "name": "checkmateai",
-  "version": "1.0.0",
-  "description": "Plain-English specs that live in Git and block 'Done' until every box turns green",
+  "name": "checkmate",
+  "version": "0.1.0",
+  "description": "AI-powered specs verification that block bad code, challenges AI's overconfidence, and prevent AI from breaking your code",
   "main": "dist/index.js",
   "type": "module",
-  "bin": {
-    "checkmate": "dist/index.js",
-    "checkmate-mcp": "src/mcp/index.ts"
-  },
+  "bin": "dist/index.js",
   "scripts": {
-    "test": "node tests/run-tests.mjs",
+    "test": "node tests/unit/commands/test-gen.mjs",
     "test:coverage": "node tests/run-coverage.mjs",
     "test:all": "./scripts/test-coverage.sh",
     "build": "tsc",
@@ -23,7 +20,8 @@
     "spec-snapshot": "node scripts/spec-snapshot.js create",
     "spec-verify": "node scripts/spec-snapshot.js verify",
     "spec-diff": "node scripts/spec-snapshot.js diff",
-    "enforce": "node scripts/cm-enforce.js"
+    "enforce": "node scripts/cm-enforce.js",
+    "start": "node dist/index.js"
   },
   "keywords": [
     "tdd",
@@ -34,8 +32,8 @@
     "cursor",
     "mcp"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Richardson Dackam",
+  "license": "MIT",
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/string-similarity": "^4.0.2",
@@ -92,5 +90,12 @@
   },
   "overrides": {
     "punycode": "npm:punycode.js@^2.3.1"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/richardsondx/checkmate.git"
   }
 }

@@ -1,4 +1,4 @@
-# CheckMate ⬜️⬛️⬜️ | [![Star on GitHub](https://img.shields.io/github/stars/checkmateai/checkmate?style=social)](https://github.com/checkmateai/checkmate/stargazers)
+# CheckMate ⬜️⬛️⬜️ | [![Star on GitHub](https://img.shields.io/github/stars/richardsondx/checkmate?style=social)](https://github.com/richardsondx/checkmate/stargazers)
 
 By [@Richardsondx](https://x.com/richardsondx)
 
