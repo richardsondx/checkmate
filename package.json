@@ -1,6 +1,6 @@
 {
   "name": "checkmateai",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "AI-powered specs verification that block bad code, challenges AI's overconfidence, and prevent AI from breaking your code",
   "main": "dist/index.js",
   "type": "module",
