@@ -1,1 +1,25 @@
-  - ErrorMessage: ⚠️ Possible spec drift detected. Implementation has diverged from spec.
+---
+description: Monitors and reports on spec drift when files are saved. Use to maintain alignment between implementation and specifications automatically.
+globs: 
+alwaysApply: false
+---
+# CheckMate · Spec‑vs‑Code Drift on Save
+
+This rule monitors files for spec drift when they are saved, ensuring implementations stay aligned with specifications.
+
+```rule type=activation
+activationTrigger:
+  event: file_save
+  path: ["**/*.ts", "**/*.js", "**/*.tsx", "**/*.jsx"]
+  maxRuns: 1
+```
+
+```rule type=on_file_save
+# Run spec drift detection script
+checkmate run-script cm-spec-drift $FILE_PATH
+if [ $? -ne 0 ]; then
+  echo "⚠️ Possible spec drift detected. Implementation has diverged from spec."
+else
+  echo "✅ Spec drift check completed. No drift detected."
+fi
+```

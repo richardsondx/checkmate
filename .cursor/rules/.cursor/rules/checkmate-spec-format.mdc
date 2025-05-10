@@ -1,9 +1,0 @@
----
-description: "Enforces consistent formatting for CheckMate specification files. Use when creating or editing spec files to ensure they follow conventions."
-type: "Agent Requested"
-globs: 
-alwaysApply: false
----
-# CheckMate · Spec‑Format Linter
-- On file save in checkmate/specs/, validate format
-  - Execute: node scripts/validate-spec-format.js "$FILEPATH"

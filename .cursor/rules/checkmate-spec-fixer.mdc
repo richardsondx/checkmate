@@ -1,3 +1,8 @@
+---
+description: Helps fix issues in CheckMate spec files, including formatting and content problems. Use when specs need correction or standardization.
+globs: 
+alwaysApply: false
+---
 # CheckMate · Spec Format Auto-Fixer
 
 This rule automatically fixes CheckMate spec files that don't meet format standards.
@@ -17,7 +22,7 @@ if [[ "$FILEPATH" == *.md ]]; then
     echo "🔍 Validating and auto-fixing spec format: $FILEPATH"
     
     # Run the validator with the fix flag
-    node scripts/validate-spec-format.js "$FILEPATH" --fix
+    checkmate run-script validate-spec-format "$FILEPATH" --fix
 
     if [ $? -eq 0 ]; then
       echo "✅ Spec format is valid or has been fixed"
@@ -28,3 +33,6 @@ if [[ "$FILEPATH" == *.md ]]; then
   fi
 fi
 ```
+```
+
+</rewritten_file>

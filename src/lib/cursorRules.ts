@@ -27,7 +27,7 @@ const RULE_TEMPLATES = {
   - SetEnv: CM_FIX_COUNT=0`,
 
   'post-task': `${RULE_FRONTMATTER}# CheckMate – Verify & Auto‑Fix
-- Execute: node scripts/cm-enforce.js run \\
+- Execute: checkmate run-script cm-enforce run \\
            --target "$(jq -r '.[]' .cursor/cm_list.json)" \\
            --fail-early
 - Env:
@@ -35,7 +35,7 @@ const RULE_TEMPLATES = {
     CM_FIX_COUNT: $CM_FIX_COUNT`,
 
   'post-push': `${RULE_FRONTMATTER}# CheckMate – Full Suite on Push
-- Execute: node scripts/cm-enforce.js run`
+- Execute: checkmate run-script cm-enforce run`
 };
 
 /**
@@ -99,8 +99,23 @@ export function createMdcRules(force = false): void {
   console.log(chalk.blue("Setting up CheckMate validation rules in .mdc format..."));
   
   try {
-    // Run the create-cursor-mdc-rules script
-    const result = spawnSync('node', ['scripts/create-cursor-mdc-rules.js'], {
+    // Find the script relative to the CheckMate package using ES module compatible approach
+    // Note: import.meta.url isn't available in this context since this code will be compiled
+    // Let's use a different approach with process.cwd()
+    const packageDir = process.cwd();
+    const scriptPath = path.join(packageDir, 'scripts', 'create-cursor-mdc-rules.js');
+    
+    console.log(chalk.blue(`Looking for script at: ${scriptPath}`));
+    
+    // Check if the script exists at the resolved path
+    if (!fs.existsSync(scriptPath)) {
+      console.error(chalk.yellow(`Warning: Script not found at resolved path: ${scriptPath}`));
+      console.error(chalk.yellow('Falling back to direct creation of rule files'));
+      return;
+    }
+    
+    // Run the create-cursor-mdc-rules script with the resolved path
+    const result = spawnSync('node', [scriptPath], {
       stdio: 'inherit'
     });
     

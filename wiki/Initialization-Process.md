@@ -75,6 +75,16 @@ mkdir -p .cursor/rules
 npx checkmateai setup-mcp
 ```
 
+The generated rule files use the `checkmate run-script` command to execute utility scripts with proper path resolution. This ensures that scripts like `cm-enforce.js` and `validate-spec-format.js` can be found and executed correctly, regardless of where CheckMate is installed.
+
+For example, a typical rule might include:
+
+```
+- Execute: checkmate run-script cm-enforce run --target "..." 
+```
+
+This approach is more reliable than direct `node scripts/...` calls which can break when CheckMate is installed as a dependency.
+
 ### 5. Create a Test Specification
 
 Create a simple test specification to verify your setup:

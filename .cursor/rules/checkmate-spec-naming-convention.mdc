@@ -1,3 +1,9 @@
+---
+description: Ensures CheckMate spec files follow proper naming conventions with slugified names, lowercase letters, and hyphens. Use when creating new spec files.
+type: "Agent Requested"
+globs: 
+alwaysApply: false
+---
 # CheckMate · Spec Naming Convention
 
 This rule ensures that all spec files in the checkmate/specs directory follow proper naming conventions:

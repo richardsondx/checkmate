@@ -1,7 +1,18 @@
+---
+description: Helps enforce automatic fixing of failing CheckMate checks by continuing fix attempts until max_attempts is reached. Use when verification fails to ensure comprehensive fixing.
+globs: 
+alwaysApply: false
+---
+# CheckMate · Auto-Fix Enforcer
+
+This rule ensures that when a feature validation fails, CheckMate continuously attempts fixes until it reaches max_attempts.
+
+```rule type=activation
 activationTrigger:
   event: after_command
   pattern: "checkmate audit --spec"
   maxRuns: 5  # Match max_attempts from .checkmate
+```
 
 ```rule type=on_activation
 # Check if audit failed

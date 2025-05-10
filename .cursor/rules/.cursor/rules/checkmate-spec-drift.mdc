@@ -1,9 +1,0 @@
----
-description: "Detects divergence between code implementation and CheckMate specifications. Use when checking if code has changed without corresponding spec updates."
-type: "Agent Requested"
-globs: 
-alwaysApply: false
----
-# CheckMate · Spec‑vs‑Code Drift Audit
-- After each commit, audit changed specs
-  - Execute: checkmate audit --target "$CM_LIST" --quiet --audit

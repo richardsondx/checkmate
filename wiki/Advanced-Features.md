@@ -232,6 +232,50 @@ Time filter options for `--since`:
 
 All telemetry data is stored locally in the `.checkmate-telemetry/` directory, which is automatically added to `.gitignore` during initialization.
 
+## Utility Scripts Management
+
+CheckMate includes several utility scripts that help with various tasks like enforcing spec checks, detecting drift, and managing spec formats. These scripts are located in the `scripts/` directory of the CheckMate installation.
+
+### Running Utility Scripts
+
+Instead of running these scripts directly with Node.js (which can lead to path resolution issues), CheckMate provides a dedicated command to execute them:
+
+```bash
+# General syntax
+checkmate run-script <script-name> [arguments...]
+
+# Examples:
+checkmate run-script cm-enforce run --target my-feature
+checkmate run-script validate-spec-format checkmate/specs/user-auth.md --fix
+checkmate run-script cm-spec-drift path/to/changed/file.js
+```
+
+This command ensures that:
+1. The correct script from the CheckMate package is found and executed
+2. Proper paths are maintained regardless of where CheckMate is installed
+3. Scripts run with consistent environment variables and context
+
+### Key Utility Scripts
+
+The most commonly used utility scripts include:
+
+| Script Name | Purpose | Example |
+|-------------|---------|---------|
+| `cm-enforce.js` | Runs CheckMate checks with auto-fix capabilities | `checkmate run-script cm-enforce run --target user-auth` |
+| `validate-spec-format.js` | Validates and fixes spec formatting | `checkmate run-script validate-spec-format my-spec.md --fix` |
+| `cm-spec-drift.js` | Detects potential drift between code and specs | `checkmate run-script cm-spec-drift src/auth.js` |
+
+### Benefits Over Direct Script Execution
+
+Using `checkmate run-script` instead of direct `node scripts/...` calls provides several advantages:
+
+1. **Path Independence**: Works regardless of where CheckMate is installed (global, local, or as a dependency)
+2. **Version Consistency**: Always uses the correct script version matching your CheckMate installation
+3. **Improved Error Handling**: Provides helpful error messages if scripts are missing or malformed
+4. **Environment Setup**: Ensures scripts run with the proper CheckMate environment variables
+
+This command is especially useful in CI/CD environments, in projects using CheckMate as a dependency, and when using Cursor rules that need to call CheckMate scripts.
+
 ## Next Steps
 
 - [Command Reference](Command-Reference.md) - Learn all available commands

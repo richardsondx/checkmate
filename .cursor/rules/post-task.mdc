@@ -1,11 +1,10 @@
 ---
-description: "Runs after each task to verify changes against affected specs and apply auto-fixes as needed."
-type: "Agent Requested"
+description: Runs after each task to verify changes against affected specs and apply auto-fixes as needed.
 globs: 
 alwaysApply: false
 ---
 # CheckMate – Verify & Auto‑Fix
-- Execute: node scripts/cm-enforce.js run \
+- Execute: checkmate run-script cm-enforce run \
            --target "$(jq -r '.[]' .cursor/cm_list.json)" \
            --fail-early
 - Env:

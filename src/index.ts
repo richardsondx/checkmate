@@ -48,8 +48,6 @@ if (showBannerCommands.includes(command)) {
 yargsInstance
   // Init command
   .command('init', 'Initialize CheckMate in the current project', {}, () => {
-    // Always show banner for init
-    printBanner();
     configCommands.init();
   })
   

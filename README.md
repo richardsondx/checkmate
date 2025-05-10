@@ -181,6 +181,7 @@ checkmate model set reason claude-3-haiku
 | `checkmate watch --spec user-auth --until-pass` | Watch a specific spec until it passes. |
 | `checkmate model set quick gpt-4o-mini` | Swap the model in the config. |
 | `checkmate stats` | Display token usage and estimated costs. |
+| `checkmate run-script <script-name> [...args]` | Run internal CheckMate utility scripts with proper paths. |
 
 ---
 

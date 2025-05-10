@@ -1,5 +1,5 @@
 ---
-description: "Runs before each task to determine which specs are affected by changes and resets fix counters."
+description: Runs before each task to determine which specs are affected by changes and resets fix counters.
 type: "Agent Requested"
 globs: 
 alwaysApply: false

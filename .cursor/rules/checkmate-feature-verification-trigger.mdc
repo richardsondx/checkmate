@@ -1,6 +1,5 @@
 ---
 description: Triggers verification of features when user asks to check if a feature works with CheckMate. Use when asked to verify, test, or validate that a feature is working.
-type: "Agent Requested"
 globs: 
 alwaysApply: false
 ---
@@ -49,10 +48,11 @@ This rule detects natural language requests to verify, check, or test feature fu
         if [[ "$CREATE_SPEC" == "y" ]]; then
           # Step 3: Create the spec in checkmate/specs/ directory
           echo "📝 Creating spec for ${featureName}..."
-          node dist/index.js gen "${featureName}" --yes
+          echo "Executing: checkmate gen \"${featureName}\" --yes"
+          checkmate gen "${featureName}" --yes
           
           # Get the newly created spec
-          SPEC_FILES=$(find checkmate/specs -name "*${slugifiedName}*.md" -o -name "*${slugifiedName}*.yaml" -o -name "*${slugifiedName}*.yml")
+          SPEC_FILES=$(find checkmate/specs -name "*${slugifiedName}*.md" -o -name "*${slugifiedName}*.yml")
           
           if [ -z "$SPEC_FILES" ]; then
             echo "❌ Failed to create spec for ${featureName}."
@@ -107,13 +107,13 @@ This rule detects natural language requests to verify, check, or test feature fu
         OUTCOME_REPORT="Examined the implementation and found that it meets the requirement: ${CHECK_TEXT}"
         
         # Run the verification command
-        node ./dist/index.js verify-llm-reasoning --spec "$SPEC_NAME" --check-id "$i" \
-          --success-condition "$SUCCESS_CONDITION" \
-          --failure-condition "$FAILURE_CONDITION" \
-          --outcome-report "$OUTCOME_REPORT"
+        echo "🔬 Verifying check item '$i' for spec '$SPEC_NAME'..."
+        echo "Executing: checkmate verify-llm-reasoning --spec \"$SPEC_NAME\" --check-id \"$i\" ${AUTO_FIX_FLAG} ${INTERACTIVE_MODE}"
+        COMMAND_OUTPUT=$(checkmate verify-llm-reasoning --spec "$SPEC_NAME" --check-id "$i" ${AUTO_FIX_FLAG} ${INTERACTIVE_MODE})
+        COMMAND_EXIT_CODE=$?
         
         # Get verification result
-        VERIFICATION_RESULT=$?
+        VERIFICATION_RESULT=$COMMAND_EXIT_CODE
         
         # Step 5: If verification fails, attempt fixes until reaching max_attempts
         CURRENT_FIX_ATTEMPT=0
@@ -127,13 +127,12 @@ This rule detects natural language requests to verify, check, or test feature fu
           # Re-run verification with updated outcome report
           OUTCOME_REPORT="After implementing fixes, the code now ${CHECK_TEXT} successfully"
           
-          node ./dist/index.js verify-llm-reasoning --spec "$SPEC_NAME" --check-id "$i" \
-            --success-condition "$SUCCESS_CONDITION" \
-            --failure-condition "$FAILURE_CONDITION" \
-            --outcome-report "$OUTCOME_REPORT" \
-            --force
+          echo "🔬 Verifying check item '$i' for spec '$SPEC_NAME'..."
+          echo "Executing: checkmate verify-llm-reasoning --spec \"$SPEC_NAME\" --check-id \"$i\" ${AUTO_FIX_FLAG} ${INTERACTIVE_MODE}"
+          COMMAND_OUTPUT=$(checkmate verify-llm-reasoning --spec "$SPEC_NAME" --check-id "$i" ${AUTO_FIX_FLAG} ${INTERACTIVE_MODE})
+          COMMAND_EXIT_CODE=$?
           
-          VERIFICATION_RESULT=$?
+          VERIFICATION_RESULT=$COMMAND_EXIT_CODE
           
           if [ $VERIFICATION_RESULT -eq 0 ]; then
             echo "✅ Fix successful on attempt $CURRENT_FIX_ATTEMPT!"
@@ -218,4 +217,5 @@ This rule detects natural language requests to verify, check, or test feature fu
       
       return commands.join('\n');
     Explanation: This rule implements a complete CheckMate Feature Validation Workflow directly, providing a self-contained mechanism to verify feature functionality against CheckMate specifications.
+```
 ```

@@ -8,6 +8,11 @@
     "checkmateai": "./bin/checkmateai",
     "checkmate": "./bin/checkmate"
   },
+  "files": [
+    "dist",
+    "bin",
+    "scripts"
+  ],
   "scripts": {
     "test": "node tests/unit/commands/test-gen.mjs",
     "test:coverage": "node tests/run-coverage.mjs",

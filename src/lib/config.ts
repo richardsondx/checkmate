@@ -50,8 +50,34 @@ const DEFAULT_CONFIG: CheckMateConfig = {
   }
 };
 
+// Example configuration for .checkmate.example
+const EXAMPLE_CONFIG: CheckMateConfig = {
+  openai_key: 'sk-proj...',
+  anthropic_key: 'sk-ant...',
+  models: {
+    reason: 'claude-3-7-sonnet-20250219',
+    quick: 'gpt-4o-mini',
+  },
+  tree_cmd: "git ls-files | grep -E '\\\\.(ts|js|tsx|jsx)$'",
+  log: 'optional',
+  context_top_n: 40,
+  show_thinking: true,
+  use_embeddings: true,
+  pricing: {
+    'openai/gpt-4o': 0.01,
+    'openai/gpt-4o-mini': 0.005,
+    'anthropic/claude-3-opus': 0.015,
+    'anthropic/claude-3-sonnet': 0.008,
+    'anthropic/claude-3-haiku': 0.00025,
+  },
+  auto_fix: {
+    max_attempts: 5
+  }
+};
+
 // Path to config file
 const CONFIG_FILE = '.checkmate';
+const EXAMPLE_CONFIG_FILE = '.checkmate.example';
 
 /**
  * Load configuration from .checkmate file
@@ -128,5 +154,21 @@ export function ensureConfigExists(): void {
   if (!fs.existsSync(CONFIG_FILE)) {
     save(DEFAULT_CONFIG);
     console.log(`Created default config file: ${CONFIG_FILE}`);
+  }
+  
+  // Always create or update the example config file
+  createExampleConfig();
+}
+
+/**
+ * Create .checkmate.example file with example configuration
+ */
+export function createExampleConfig(): void {
+  try {
+    const yamlStr = stringify(EXAMPLE_CONFIG);
+    fs.writeFileSync(EXAMPLE_CONFIG_FILE, yamlStr, 'utf8');
+    console.log(`Created example config file: ${EXAMPLE_CONFIG_FILE}`);
+  } catch (error) {
+    console.error('Error creating example config:', error);
   }
 } 
