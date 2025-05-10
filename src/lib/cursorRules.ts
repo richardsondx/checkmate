@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 // Constants
 const CURSOR_RULES_DIR = '.cursor/rules';
@@ -69,18 +70,148 @@ export function writeRule(name: string, content: string, force = false): boolean
 }
 
 /**
+ * Copy rule files directly from the installed checkmateai package
+ * This ensures consistent rule templates across all projects
+ */
+export function copyRulesFromPackage(force = false): boolean {
+  console.log(chalk.blue("Copying rule templates from checkmateai package..."));
+  
+  try {
+    ensureCursorRulesDir();
+    
+    // First try locating ourselves directly
+    const currentFilePath = fileURLToPath(import.meta.url);
+    console.log(chalk.blue(`Current file path: ${currentFilePath}`));
+
+    // We need to figure out if we're running from source or from an installed package
+    // Strategy 1: Direct derivation from current path
+    let packageDir = path.resolve(currentFilePath, '..', '..', '..'); 
+    
+    // Alternative strategy: Use the project's root directory (where we're running from)
+    const projectRoot = process.cwd();
+    console.log(chalk.blue(`Project root: ${projectRoot}`));
+    
+    // First check if we're running from within the package itself
+    if (projectRoot.endsWith('/checkmateai')) {
+      console.log(chalk.blue('Running from within the checkmateai package'));
+      packageDir = projectRoot;
+    }
+    
+    console.log(chalk.blue(`Package directory: ${packageDir}`));
+    
+    // Check several possible locations for the rule templates
+    const possibleRulesDirs = [
+      path.join(packageDir, '.cursor', 'rules'),                      // Direct package
+      path.join(projectRoot, '.cursor', 'rules'),                    // Project root
+      path.join(projectRoot, 'node_modules', 'checkmateai', '.cursor', 'rules') // node_modules
+    ];
+    
+    let packageRulesDir: string | null = null;
+    
+    // Find the first directory that exists and contains .mdc files
+    for (const dir of possibleRulesDirs) {
+      console.log(chalk.blue(`Checking for rule templates in: ${dir}`));
+      if (fs.existsSync(dir)) {
+        try {
+          const files = fs.readdirSync(dir);
+          if (files.some(file => file.endsWith('.mdc'))) {
+            packageRulesDir = dir;
+            console.log(chalk.green(`Found rule templates in: ${dir}`));
+            break;
+          }
+        } catch (err) {
+          console.error(chalk.yellow(`Error reading directory ${dir}: ${err}`));
+        }
+      }
+    }
+    
+    if (!packageRulesDir) {
+      console.error(chalk.yellow('No rule templates directory found'));
+      return false;
+    }
+    
+    // Get list of all .mdc files in the package rules directory
+    let ruleFiles: string[] = [];
+    try {
+      ruleFiles = fs.readdirSync(packageRulesDir)
+        .filter(file => file.endsWith('.mdc'));
+    } catch (err) {
+      console.error(chalk.red(`Error reading package rules directory: ${err}`));
+      return false;
+    }
+    
+    if (ruleFiles.length === 0) {
+      console.error(chalk.yellow('No .mdc rule files found in package'));
+      return false;
+    }
+    
+    // Copy each rule file
+    let successCount = 0;
+    for (const ruleFile of ruleFiles) {
+      const sourcePath = path.join(packageRulesDir, ruleFile);
+      const destPath = path.join(CURSOR_RULES_DIR, ruleFile);
+      
+      // Check if destination file already exists
+      if (fs.existsSync(destPath) && !force) {
+        console.log(chalk.yellow(`Rule file ${ruleFile} already exists. Skipping.`));
+        continue;
+      }
+      
+      try {
+        // Copy the file
+        fs.copyFileSync(sourcePath, destPath);
+        console.log(chalk.green(`Copied rule file: ${ruleFile}`));
+        successCount++;
+      } catch (err) {
+        console.error(chalk.red(`Error copying ${ruleFile}: ${err}`));
+      }
+    }
+    
+    if (successCount > 0) {
+      console.log(chalk.green(`Successfully copied ${successCount} rule files from package`));
+      
+      // Create a marker file to indicate we've imported from the package
+      // This will be used by create-cursor-mdc-rules.js to know it can skip template-based creation
+      try {
+        const markerPath = path.join(CURSOR_RULES_DIR, '.package-imported');
+        fs.writeFileSync(markerPath, new Date().toISOString(), 'utf8');
+        console.log(chalk.green('Created package import marker file'));
+      } catch (err) {
+        console.error(chalk.yellow(`Warning: Could not create marker file: ${err}`));
+      }
+      
+      return true;
+    } else {
+      console.error(chalk.yellow('No rule files were copied from package'));
+      return false;
+    }
+  } catch (error) {
+    console.error(chalk.red("Failed to copy rules from package:"), error);
+    return false;
+  }
+}
+
+/**
  * Generate all rule files
  */
 export function generateAllRules(force = false): void {
   ensureCursorRulesDir();
   
-  // Create each rule file
-  Object.entries(RULE_TEMPLATES).forEach(([name, content]) => {
-    writeRule(name, content, force);
-  });
+  // Try to copy rules from package first
+  const packageCopySuccess = copyRulesFromPackage(force);
   
-  // Create/update additional .mdc validation rules using our dedicated script
-  createMdcRules(force);
+  // If package copy failed, fall back to legacy method
+  if (!packageCopySuccess) {
+    console.log(chalk.blue("Falling back to template-based rule generation..."));
+    
+    // Create each rule file from templates
+    Object.entries(RULE_TEMPLATES).forEach(([name, content]) => {
+      writeRule(name, content, force);
+    });
+    
+    // Create/update additional .mdc validation rules using our dedicated script
+    createMdcRules(force);
+  }
 }
 
 /**
@@ -96,6 +227,15 @@ export function setupJsonRules(force = false): void {
  * Set up all the .mdc rule files for CheckMate validation
  */
 export function createMdcRules(force = false): void {
+  // Try to copy rules from package first
+  const packageCopySuccess = copyRulesFromPackage(force);
+  
+  // If package copy was successful, we're done
+  if (packageCopySuccess) {
+    return;
+  }
+  
+  // Otherwise fall back to using the script
   console.log(chalk.blue("Setting up CheckMate validation rules in .mdc format..."));
   
   try {
