@@ -18,12 +18,17 @@ const __dirname = path.dirname(__filename);
 // Get the project root directory (parent of the scripts directory)
 const projectRoot = path.resolve(__dirname, '..');
 
+// Check for command line arguments
+const useCheckmateDir = process.argv.includes('--use-checkmate-dir');
+
 // Define the rules directory
-const rulesDir = path.join(projectRoot, '.cursor', 'rules');
+const baseRulesDir = path.join(projectRoot, '.cursor', 'rules');
+const rulesDir = useCheckmateDir ? path.join(baseRulesDir, 'checkmate') : baseRulesDir;
 
 // Log for debugging
 console.log(`Project root: ${projectRoot}`);
 console.log(`Rules directory: ${rulesDir}`);
+console.log(`Using checkmate subdirectory: ${useCheckmateDir}`);
 
 // Check if we've already copied rules from the package
 // If so, we can exit early
@@ -40,7 +45,7 @@ function checkForPackageImportedRules() {
 // Create rules directory if it doesn't exist
 if (!fs.existsSync(rulesDir)) {
   fs.mkdirSync(rulesDir, { recursive: true });
-  console.log('Created .cursor/rules directory');
+  console.log(`Created rules directory: ${rulesDir}`);
 }
 
 // Check if we should exit early

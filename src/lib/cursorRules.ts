@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 // Constants
 const CURSOR_RULES_DIR = '.cursor/rules';
+const CHECKMATE_RULES_DIR = '.cursor/rules/checkmate';
 
 // Frontmatter for Cursor rules
 const RULE_FRONTMATTER = `---
@@ -43,9 +44,16 @@ const RULE_TEMPLATES = {
  * Ensure the Cursor rules directory exists
  */
 export function ensureCursorRulesDir(): void {
+  // Ensure main rules directory exists
   if (!fs.existsSync(CURSOR_RULES_DIR)) {
     fs.mkdirSync(CURSOR_RULES_DIR, { recursive: true });
     console.log(`Created directory: ${CURSOR_RULES_DIR}`);
+  }
+  
+  // Ensure checkmate subdirectory exists
+  if (!fs.existsSync(CHECKMATE_RULES_DIR)) {
+    fs.mkdirSync(CHECKMATE_RULES_DIR, { recursive: true });
+    console.log(`Created directory: ${CHECKMATE_RULES_DIR}`);
   }
 }
 
@@ -55,7 +63,8 @@ export function ensureCursorRulesDir(): void {
 export function writeRule(name: string, content: string, force = false): boolean {
   ensureCursorRulesDir();
   
-  const rulePath = path.join(CURSOR_RULES_DIR, `${name}.mdc`);
+  // Use the checkmate subdirectory for all checkmate rules
+  const rulePath = path.join(CHECKMATE_RULES_DIR, `${name}.mdc`);
   
   // Check if file already exists
   if (fs.existsSync(rulePath) && !force) {
@@ -101,9 +110,12 @@ export function copyRulesFromPackage(force = false): boolean {
     
     // Check several possible locations for the rule templates
     const possibleRulesDirs = [
-      path.join(packageDir, '.cursor', 'rules'),                      // Direct package
-      path.join(projectRoot, '.cursor', 'rules'),                    // Project root
-      path.join(projectRoot, 'node_modules', 'checkmateai', '.cursor', 'rules') // node_modules
+      path.join(packageDir, '.cursor', 'rules', 'checkmate'),                      // Direct package (checkmate subdir)
+      path.join(packageDir, '.cursor', 'rules'),                                   // Direct package (main rules dir)
+      path.join(projectRoot, '.cursor', 'rules', 'checkmate'),                     // Project root (checkmate subdir)
+      path.join(projectRoot, '.cursor', 'rules'),                                  // Project root (main rules dir)
+      path.join(projectRoot, 'node_modules', 'checkmateai', '.cursor', 'rules', 'checkmate'), // node_modules (checkmate subdir)
+      path.join(projectRoot, 'node_modules', 'checkmateai', '.cursor', 'rules')    // node_modules (main rules dir)
     ];
     
     let packageRulesDir: string | null = null;
@@ -145,11 +157,11 @@ export function copyRulesFromPackage(force = false): boolean {
       return false;
     }
     
-    // Copy each rule file
+    // Copy each rule file to the CHECKMATE_RULES_DIR directory
     let successCount = 0;
     for (const ruleFile of ruleFiles) {
       const sourcePath = path.join(packageRulesDir, ruleFile);
-      const destPath = path.join(CURSOR_RULES_DIR, ruleFile);
+      const destPath = path.join(CHECKMATE_RULES_DIR, ruleFile);
       
       // Check if destination file already exists
       if (fs.existsSync(destPath) && !force) {
@@ -160,7 +172,7 @@ export function copyRulesFromPackage(force = false): boolean {
       try {
         // Copy the file
         fs.copyFileSync(sourcePath, destPath);
-        console.log(chalk.green(`Copied rule file: ${ruleFile}`));
+        console.log(chalk.green(`Copied rule file to checkmate subdirectory: ${ruleFile}`));
         successCount++;
       } catch (err) {
         console.error(chalk.red(`Error copying ${ruleFile}: ${err}`));
@@ -168,14 +180,14 @@ export function copyRulesFromPackage(force = false): boolean {
     }
     
     if (successCount > 0) {
-      console.log(chalk.green(`Successfully copied ${successCount} rule files from package`));
+      console.log(chalk.green(`Successfully copied ${successCount} rule files from package to checkmate subdirectory`));
       
       // Create a marker file to indicate we've imported from the package
       // This will be used by create-cursor-mdc-rules.js to know it can skip template-based creation
       try {
-        const markerPath = path.join(CURSOR_RULES_DIR, '.package-imported');
+        const markerPath = path.join(CHECKMATE_RULES_DIR, '.package-imported');
         fs.writeFileSync(markerPath, new Date().toISOString(), 'utf8');
-        console.log(chalk.green('Created package import marker file'));
+        console.log(chalk.green('Created package import marker file in checkmate subdirectory'));
       } catch (err) {
         console.error(chalk.yellow(`Warning: Could not create marker file: ${err}`));
       }
@@ -254,8 +266,8 @@ export function createMdcRules(force = false): void {
       return;
     }
     
-    // Run the create-cursor-mdc-rules script with the resolved path
-    const result = spawnSync('node', [scriptPath], {
+    // Run the create-cursor-mdc-rules script with the resolved path and pass the --use-checkmate-dir flag
+    const result = spawnSync('node', [scriptPath, '--use-checkmate-dir'], {
       stdio: 'inherit'
     });
     

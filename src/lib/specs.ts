@@ -90,6 +90,7 @@ IMPORTANT: The ONLY allowed format is:
 
 DO NOT include any other sections, headings, or notes.
 DO NOT include a "## Files" or "## Relevant Files" section as we will add this metadata separately.
+ENSURE all checkboxes are EMPTY [ ] and NOT pre-filled with green or red squares.
 
 Make each check specific to actual code functionality, referencing functions, methods or components that exist in the code.
 Return ONLY the markdown content, no explanations or additional text.`;
@@ -106,6 +107,7 @@ The specification MUST be a Markdown document with EXACTLY this format:
 
 DO NOT include any other headings like "## Implementation Notes", "## Feature Requirements", "## Architecture Considerations", etc.
 DO NOT include a "## Files" or "## Relevant Files" section.
+CRITICAL: All checkboxes MUST be EMPTY [ ] and NOT pre-filled with any status indicators.
 
 Use clear language and avoid jargon.
 Format your response as a valid Markdown document.`;
@@ -125,6 +127,16 @@ Format your response as a valid Markdown document.`;
     
     // Add meta information with automatic file discovery
     await autoFilesModule.addMetaToSpec(filePath, true);
+    
+    try {
+      // Run the check format script to ensure proper checkbox format
+      console.log('Running check format verification...');
+      const { execSync } = await import('node:child_process');
+      execSync('node scripts/fix-check-format.js', { stdio: 'inherit' });
+    } catch (formatError) {
+      console.warn('Warning: Check format script execution failed:', formatError);
+      // Continue with the process even if format checking fails
+    }
     
     // Read the updated content with meta
     const updatedContent = fs.readFileSync(filePath, 'utf8');
@@ -154,6 +166,16 @@ Format your response as a valid Markdown document.`;
     
     // Add meta information with automatic file discovery
     await autoFilesModule.addMetaToSpec(filePath, true);
+    
+    try {
+      // Run the check format script to ensure proper checkbox format even for fallback content
+      console.log('Running check format verification...');
+      const { execSync } = await import('node:child_process');
+      execSync('node scripts/fix-check-format.js', { stdio: 'inherit' });
+    } catch (formatError) {
+      console.warn('Warning: Check format script execution failed:', formatError);
+      // Continue with the process even if format checking fails
+    }
     
     // Read the updated content with meta
     const updatedContent = fs.readFileSync(filePath, 'utf8');

@@ -29,6 +29,8 @@
     "spec-verify": "node scripts/spec-snapshot.js verify",
     "spec-diff": "node scripts/spec-snapshot.js diff",
     "enforce": "node scripts/cm-enforce.js",
+    "fix-checkboxes": "node scripts/fix-prefilled-checkboxes.js",
+    "fix-check-format": "node scripts/fix-check-format.js",
     "start": "node dist/index.js"
   },
   "keywords": [
