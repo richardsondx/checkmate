@@ -16,7 +16,7 @@ const CHECKMATE_RULES_DIR = '.cursor/rules/checkmate';
 const RULE_FRONTMATTER = `---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 `;
 

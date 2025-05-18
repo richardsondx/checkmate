@@ -59,7 +59,7 @@ function addFrontmatter(content, description) {
 description: ${description}
 type: "Agent Requested"
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 ${content}`;
 }

@@ -4,9 +4,9 @@ CheckMate is designed for deep integration with AI coding assistants like Cursor
 
 ## Key Integration Rule
 
-The primary integration happens through the `checkmate-feature-validation-workflow.mdc` rule, located in the `.cursor/rules/` directory. 
+The primary integration happens through the `ai-feature-validation-guidelines.mdc` and `verification-trigger.mdc` rules, located in the `.cursor/rules/checkmate/` directory. 
 
-This rule is triggered when you ask Cursor to work on a feature using CheckMate. It orchestrates the TDD loop by:
+These rules are triggered when you ask Cursor to work on a feature using CheckMate. They orchestrate the TDD loop by:
 
 1. Calling `checkmate list-checks` to provide Cursor with a checklist for the specified feature
 2. Instructing Cursor to define success/failure conditions, verify/implement code, and report outcomes
@@ -95,18 +95,19 @@ The second check for 'profile-picture-upload' is unclear. Can CheckMate clarify 
 
 ## Available Rules
 
-CheckMate's Cursor integration includes several rules in the `.cursor/rules/` directory:
+CheckMate's Cursor integration includes several rules in the `.cursor/rules/checkmate/` directory:
 
-- `checkmate-feature-validation-workflow.mdc` - Primary TDD workflow orchestrator that guides the validation process
-- `checkmate-feature-verification-trigger.mdc` - Detects natural language requests to verify/check/test features and triggers the verification workflow
-- `checkmate-auto-fix-enforce.mdc` - Enforces continuous fix attempts until all checks pass or max attempts are reached
-- `checkmate-spec-creator.mdc` - Helps create new properly formatted specs from templates
-- `checkmate-spec-fixer.mdc` - Assists in fixing failing checks and offers targeted solutions
-- `checkmate-spec-format.mdc` - Ensures proper spec formatting is maintained
-- `checkmate-spec-naming-convention.mdc` - Enforces consistent naming conventions for spec files (using kebab-case)
-- `checkmate-spec-drift.mdc` - Detects when specs drift from implementation
-- `checkmate-spec-drift-on-save.mdc` - Checks for spec drift when files are saved
-- `checkmate-non-interactive.mdc` - Ensures CheckMate commands run in non-interactive mode when executed by Cursor
+- `ai-feature-validation-guidelines.mdc` - Instructional guide for AI validation
+- `ai-verify-llm-reasoning-workflow-docs.mdc` - Documentation for LLM reasoning workflow
+- `verification-trigger.mdc` - Detects natural language requests to verify/check/test features and triggers the verification workflow
+- `autofix-enforcer.mdc` - Enforces continuous fix attempts until all checks pass or max attempts are reached
+- `spec-assistant.mdc` - Helps create new properly formatted specs from templates
+- `spec-linter.mdc` - Automated linting and fixing of spec files
+- `drift-detector.mdc` - Detects when specs drift from implementation
+- `non-interactive-mode.mdc` - Ensures CheckMate commands run in non-interactive mode when executed by Cursor
+- `pre-task.mdc` - Runs before each task to determine which specs are affected by changes
+- `post-task.mdc` - Runs after each task to verify changes against affected specs
+- `post-push.mdc` - Runs full test suite on pushes to prevent regressions
 
 ## Command Reference for Cursor Integration
 
@@ -138,13 +139,13 @@ You can ask Cursor to use other CheckMate commands:
 
 ## Customizing Cursor Rules
 
-The `.cursor/rules/` directory contains the integration logic. You can customize these `.mdc` files, although the default `checkmate-feature-validation-workflow.mdc` provides the core TDD loop.
+The `.cursor/rules/checkmate/` directory contains the integration logic. You can customize these `.mdc` files, although the default `verification-trigger.mdc` and `ai-feature-validation-guidelines.mdc` provide the core TDD loop.
 
 Other potential rules might automatically run `checkmate status` after certain commands, but the LLM-TDD workflow is the primary intended integration.
 
 ## Cursor Rules for Automation
 
-When you initialize CheckMate with `checkmate init`, it automatically creates rule files in the `.cursor/rules/` directory that automate validation during your development workflow:
+When you initialize CheckMate with `checkmate init`, it automatically creates rule files in the `.cursor/rules/checkmate/` directory that automate validation during your development workflow:
 
 ### Task Lifecycle Rules
 
@@ -154,10 +155,9 @@ When you initialize CheckMate with `checkmate init`, it automatically creates ru
 
 ### Validation and Format Rules
 
-* `checkmate-spec-drift.mdc` - Audits changed specs after commits
-* `checkmate-spec-drift-on-save.mdc` - Checks for drift when saving code files
-* `checkmate-spec-format.mdc` - Validates spec format on save
-* `checkmate-non-interactive.mdc` - Ensures headless operation of commands
+* `drift-detector.mdc` - Detects spec-vs-code drift after commits and on file save
+* `spec-linter.mdc` - Validates and fixes spec format on save
+* `non-interactive-mode.mdc` - Ensures headless operation of commands
 
 The main task lifecycle rules execute the following commands:
 
@@ -373,33 +373,31 @@ If any check fails, you'll see:
 
 ## Cursor Rules
 
-CheckMate integrates with Cursor through several rule files that enhance and automate the workflow. These rules are created in the `.cursor/rules/` directory during initialization.
+CheckMate integrates with Cursor through several rule files that enhance and automate the workflow. These rules are created in the `.cursor/rules/checkmate/` directory during initialization.
 
 ### Available Rules
 
 | Rule File | Purpose |
 |-----------|---------|
-| `checkmate-feature-validation-workflow.mdc` | Primary TDD workflow orchestrator that guides the validation process |
-| `checkmate-feature-verification-trigger.mdc` | Detects natural language requests to verify/check/test features |
-| `checkmate-auto-fix-enforce.mdc` | Enforces automatic fixing of failing checks until max_attempts is reached |
-| `checkmate-spec-creator.mdc` | Facilitates creation of properly formatted spec files |
-| `checkmate-spec-fixer.mdc` | Helps fix issues in CheckMate spec files |
-| `checkmate-spec-format.mdc` | Ensures proper spec formatting |
-| `checkmate-spec-naming-convention.mdc` | Enforces consistent naming conventions for spec files |
-| `checkmate-spec-drift.mdc` | Detects when specs drift from implementation |
-| `checkmate-spec-drift-on-save.mdc` | Checks for spec drift when files are saved |
-| `checkmate-non-interactive.mdc` | Ensures headless operation of commands |
-| `pre-task.mdc` | Runs before a task starts |
-| `post-task.mdc` | Runs after a task completes |
-| `post-push.mdc` | Runs after pushing changes |
+| `ai-feature-validation-guidelines.mdc` | Instructional guide for AI validation |
+| `ai-verify-llm-reasoning-workflow-docs.mdc` | Documentation for LLM reasoning workflow |
+| `verification-trigger.mdc` | Detects natural language requests to verify/check/test features |
+| `autofix-enforcer.mdc` | Enforces automatic fixing of failing checks until max_attempts is reached |
+| `spec-assistant.mdc` | Helps with spec creation and format guidance |
+| `spec-linter.mdc` | Automated linting and fixing of spec files |
+| `drift-detector.mdc` | Detects spec-vs-code drift after commits and on save |
+| `non-interactive-mode.mdc` | Ensures headless operation of commands |
+| `pre-task.mdc` | Runs before each task to determine which specs are affected by changes |
+| `post-task.mdc` | Runs after each task to verify changes against affected specs |
+| `post-push.mdc` | Runs full test suite on pushes to prevent regressions |
 
 ### Command Transformations
 
-The `checkmate-non-interactive.mdc` rule automatically transforms CheckMate commands to run in non-interactive mode when executed by Cursor:
+The `non-interactive-mode.mdc` rule automatically transforms CheckMate commands to run in non-interactive mode when executed by Cursor:
 
 ```
 # Example transformations
-checkmate gen "Feature description" → checkmate gen "Feature description" --yes --non-interactive --answer y
+checkmate gen "Feature description" → checkmate gen "Feature description" --yes --non-interactive
 checkmate run → checkmate run --yes --non-interactive
 ```
 

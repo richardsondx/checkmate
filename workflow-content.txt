@@ -1,0 +1,65 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# CheckMate AI: LLM Reasoning Verification Workflow (Documentation)
+
+This document outlines the typical workflow when using the `checkmate verify-llm-reasoning` command to verify feature specifications. This process involves interaction between the user (or an AI assistant like Cursor) and the CheckMate CLI tool, which itself may use an internal LLM for logical assessment.
+This is for internal AI reference and understanding.
+
+## Workflow Diagram
+
+The following Mermaid diagram illustrates the sequence of operations:
+
+```mermaid
+graph TD
+    A[User requests feature verification for Feature X] --> B{Spec for Feature X exists?};
+    B -- No --> C[AI (e.g., Cursor) runs 'checkmate gen "Feature X"'];
+    C --> D[AI runs 'node scripts/fix-check-format.js'];
+    B -- Yes --> D;
+    D --> E[AI runs 'checkmate reset "Feature X"'];
+    E --> F{For each check in Spec for Feature X};
+    F -- Next Check --> G[AI defines Success Condition for the check];
+    G --> H[AI defines Failure Condition for the check];
+    H --> I[AI prepares/gathers Outcome Report (data or command string)];
+    I --> J[AI calls 'checkmate verify-llm-reasoning --spec "Feature X" --check-id <ID> --success-condition "..." --failure-condition "..." --outcome-report "..."'];
+    J --> K{Internal LLM within 'verify-llm-reasoning' tool evaluates: Outcome Report vs Success/Failure Conditions};
+    K -- Meets Success Condition --> L[Tool updates Spec: Check marked as 🟩];
+    K -- Meets Failure Condition or Fails Success --> M[Tool updates Spec: Check marked as 🟥];
+    L --> N{All checks for Feature X processed?};
+    M --> O{AI (e.g., Cursor) attempts to fix the underlying code for the failed check?};
+    O -- Yes, fix implemented --> G; // Re-verify the same check with new code state
+    O -- No / Max Fix Attempts Reached --> N;
+    N -- No --> F;
+    N -- Yes --> Q[Verification for Feature X Complete - AI (e.g., Cursor) reports overall results];
+```
+
+## Key Workflow Steps Explained:
+
+1.  **Initiation**: A user or an AI assistant (like Cursor) triggers the verification for a specific feature.
+2.  **Specification Handling**:
+    *   The system checks if a CheckMate specification file (`.md` or `.yaml`) exists for the feature.
+    *   If not, `checkmate gen` is typically used to create one. This might involve an LLM to draft initial checks.
+    *   The `scripts/fix-check-format.js` script is run to ensure all checkboxes (`- [ ]`) are in the standard, un-marked state.
+    *   `checkmate reset` is used to clear any previous verification states for the spec (e.g., if it was previously marked with 🟩 or 🟥).
+3.  **Per-Check Verification Loop**: For each individual check item within the specification:
+    *   **Define Conditions**: The AI assistant formulates precise `Success Condition` and `Failure Condition` strings. These are textual descriptions of what constitutes a pass or fail for the check.
+    *   **Prepare Outcome Report**: The AI assistant prepares an `Outcome Report`. This can be:
+        *   A string containing factual data, logs, or observations that the AI has already gathered.
+        *   A shell command string that `checkmate verify-llm-reasoning` can execute to gather the necessary data.
+    *   **Execute Verification**: The `checkmate verify-llm-reasoning` command is invoked with the spec name, check ID, success condition, failure condition, and the outcome report.
+    *   **Internal LLM Assessment**: The `checkmate verify-llm-reasoning` tool itself uses an internal Language Model. This internal LLM analyzes the provided `Outcome Report` (or the output of the executed command) against the `Success Condition` and `Failure Condition` to make a logical judgment: Does the outcome prove the success condition is met and the failure condition is avoided?
+    *   **Update Spec**: Based on the internal LLM's assessment, the tool updates the spec file, marking the check with 🟩 (pass) or 🟥 (fail).
+4.  **Fix Cycle (Optional)**:
+    *   If a check is marked 🟥 (fail), the AI assistant may attempt to modify the codebase to fix the issue.
+    *   After a fix attempt, the specific check is re-verified by going back to the "Define Conditions" step for that check.
+5.  **Completion**: Once all checks in the spec have been processed (and any fix cycles completed), the overall verification status is reported.
+
+This workflow is central to how CheckMateAI integrates LLM reasoning into the testing and verification process, aiming for accurate and context-aware validation of features against their specifications.
+
+```rule type=documentation
+- RuleDoc:
+  Description: "Explains the CheckMateAI LLM reasoning verification workflow using a Mermaid diagram. This is for internal AI reference and understanding. This rule itself is documentation and not an active/executable rule."
+  WorkflowFocus: "checkmate verify-llm-reasoning command and its interaction with AI/user and spec files."
+```

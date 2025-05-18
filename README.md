@@ -30,6 +30,21 @@ npx checkmateai init
 
 That's it! `checkmate init` takes care of everything - creating directories, config files, and setting up Cursor integration.
 
+It will setup your app and generate a checkmate rules folder with all the necessary rules:
+   These rules will include:
+   - pre-task.mdc - Runs before each task
+   - post-task.mdc - Runs after each task
+   - post-push.mdc - Runs after each push
+   - spec-assistant.mdc - Helps with spec creation and format guidance
+   - spec-linter.mdc - Automated linting and fixing of spec files
+   - verification-trigger.mdc - Triggers feature verification workflow
+   - autofix-enforcer.mdc - Enforces auto-fix attempts on failures
+   - drift-detector.mdc - Detects spec-vs-code drift
+   - non-interactive-mode.mdc - For headless CheckMate runs
+   - ai-feature-validation-guidelines.mdc - Instructional guide for AI validation
+   - ai-verify-llm-reasoning-workflow-docs.mdc - Documentation for LLM reasoning workflow
+
+
 After initialization, add your API keys to the auto-generated `.checkmate` file:
 
 ```yaml
@@ -234,27 +249,23 @@ These visual indicators make it immediately obvious when CheckMate is running ta
 
 ## 📜 Cursor Rule Files
 
-In addition to the config-based rules, CheckMate creates `.mdc` rule files in the `.cursor/rules/` directory:
+CheckMate automatically injects several `.mdc` rule files into your `.cursor/rules/checkmate/` directory during initialization. These rules improve Cursor's understanding of the CheckMate workflow and provide clear guidance about when and why commands are being executed.
 
+The rules include:
 
-These rule files improve Cursor's understanding of the CheckMate workflow and provide clear guidance about when and why commands are being executed. They follow Cursor's best practices with short, specific bullets and clear execution steps.
+* `pre-task.mdc` - Analyzes scope and determines which specs are affected by changes
+* `post-task.mdc` - Verifies affected specs and applies auto-fixes as needed
+* `post-push.mdc` - Runs full test suite on pushes to prevent regressions
+* `spec-assistant.mdc` - Helps with spec creation and format guidance
+* `spec-linter.mdc` - Automated linting and fixing of spec files
+* `verification-trigger.mdc` - Triggers feature verification workflow
+* `autofix-enforcer.mdc` - Enforces auto-fix attempts on failures
+* `drift-detector.mdc` - Detects spec-vs-code drift
+* `non-interactive-mode.mdc` - For CI/CD or headless CheckMate runs
+* `ai-feature-validation-guidelines.mdc` - Instructional guide for AI validation
+* `ai-verify-llm-reasoning-workflow-docs.mdc` - Documentation for LLM reasoning workflow
 
-View them in `.cursor/rules/` to understand how CheckMate integrates with your development workflow.
-
-
-
-## Cursor Rules (auto‑injected)
-
-CheckMate automatically injects several rule files into your `.cursor/rules/` directory during initialization:
-
-* `pre_task.mdc` - Analyzes scope and potential impacts before coding begins
-* `post_task.mdc` - Verifies all affected specs and blocks completion until passing
-* `post_push.mdc` - Runs full test suite on pushes to prevent regressions
-* `feature_validation.mdc` - Guides Cursor through the TDD workflow
-* `spec_generation.mdc` - Helps Cursor create and validate new specs
-* `code_review.mdc` - Analyzes changes against existing specs
-* `debug_assist.mdc` - Provides context-aware debugging guidance
-* `refactor_safety.mdc` - Ensures refactoring preserves spec compliance
+These rules follow Cursor's best practices with short, specific bullets and clear execution steps. View them in `.cursor/rules/checkmate/` to understand how CheckMate integrates with your development workflow.
 
 
 
