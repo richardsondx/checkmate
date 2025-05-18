@@ -1,4 +1,4 @@
-# CheckMate ⬜️⬛️⬜️ | [![Star on GitHub](https://img.shields.io/github/stars/richardsondx/checkmate?style=social)](https://github.com/richardsondx/checkmate/stargazers)
+# CheckMate | [![Star on GitHub](https://img.shields.io/github/stars/richardsondx/checkmate?style=social)](https://github.com/richardsondx/checkmate/stargazers)
 
 By [@Richardsondx](https://x.com/richardsondx)
 
@@ -283,6 +283,9 @@ Logs stream nicely into your dashboard or CI summary.
   <img src="https://contrib.rocks/image?repo=richardsondx/checkmate" alt="CheckMate project contributors" />
 </a>
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=richardsondx/checkmate&type=Date)](https://www.star-history.com/#richardsondx/checkmate&Date)
 
 ## Contributing
 

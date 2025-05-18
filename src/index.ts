@@ -155,6 +155,17 @@ yargsInstance
           alias: 'i',
           default: false
         })
+        .option('yes', {
+          describe: 'Skip all prompts and create spec with default options',
+          type: 'boolean',
+          alias: 'y',
+          default: false
+        })
+        .option('non-interactive', {
+          describe: 'Run in non-interactive mode (skip all prompts)',
+          type: 'boolean',
+          default: false
+        })
         .option('files', {
           describe: 'Explicitly specify files to include (glob patterns allowed)',
           type: 'array'
@@ -168,7 +179,9 @@ yargsInstance
         output: argv.output,
         interactive: argv.interactive,
         files: argv.files,
-        agent: argv.agent
+        agent: argv.agent,
+        yes: argv.yes,
+        nonInteractive: argv.nonInteractive
       });
     }
   )

@@ -27,6 +27,8 @@ interface GenOptions {
   files?: string[];
   agent?: boolean;
   answer?: string;
+  yes?: boolean;
+  nonInteractive?: boolean;
 }
 
 export async function genCommand(options?: GenOptions): Promise<{ path: string, content: string } | { paths: string[], contents: string[] }> {
@@ -57,11 +59,14 @@ export async function genCommand(options?: GenOptions): Promise<{ path: string, 
     };
   }
   
+  // Check if we're in non-interactive mode (either via --yes, --non-interactive, or in test env)
+  const nonInteractive = options?.yes || options?.nonInteractive || isTestEnv;
+  
   // Get feature name if not provided
-  const name = options?.name || await promptFeatureName(options?.answer);
+  const name = options?.name || (nonInteractive ? 'Generated Feature' : await promptFeatureName(options?.answer));
   
   // Get feature description if not provided
-  const description = options?.description || await promptFeatureDescription(name, options?.answer);
+  const description = options?.description || (nonInteractive ? `Implementation of ${name}` : await promptFeatureDescription(name, options?.answer));
   
   // Use interactive mode if specified
   if (options?.interactive) {
@@ -80,8 +85,8 @@ export async function genCommand(options?: GenOptions): Promise<{ path: string, 
     return result;
   }
   
-  // Get specification type if not provided
-  const type = options?.type || (options?.agent ? 'B' : await promptSpecificationType(options?.answer));
+  // Get specification type - default to 'regular' if in non-interactive mode
+  const type = options?.type || (options?.agent ? 'B' : (nonInteractive ? 'regular' : await promptSpecificationType(options?.answer)));
   
   console.log(chalk.cyan(`\n⚙️ Generating ${type} specification for: ${name}`));
   
@@ -739,4 +744,22 @@ function findFilesRecursive(dir = '.', fileList: string[] = []): string[] {
   });
   
   return fileList;
+}
+
+// When the module is executed directly, run the gen command
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const featureName = process.argv[2];
+  
+  const options: GenOptions = {
+    name: featureName,
+    interactive: process.argv.includes('-i') || process.argv.includes('--interactive'),
+    agent: process.argv.includes('--agent'),
+    yes: process.argv.includes('--yes'),
+    nonInteractive: process.argv.includes('--non-interactive'),
+    files: process.argv.includes('--files') ? process.argv[process.argv.indexOf('--files') + 1]?.split(',') : undefined,
+    type: process.argv.includes('--type') ? process.argv[process.argv.indexOf('--type') + 1] : undefined,
+    output: process.argv.includes('--output') ? process.argv[process.argv.indexOf('--output') + 1] : undefined,
+  };
+  
+  await genCommand(options);
 }
