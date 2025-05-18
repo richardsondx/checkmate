@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import chalk from 'chalk';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { getScriptPath, PACKAGE_ROOT } from './paths.js';
 
 // Constants
 const CURSOR_RULES_DIR = '.cursor/rules';
@@ -251,11 +252,8 @@ export function createMdcRules(force = false): void {
   console.log(chalk.blue("Setting up CheckMate validation rules in .mdc format..."));
   
   try {
-    // Find the script relative to the CheckMate package using ES module compatible approach
-    // Note: import.meta.url isn't available in this context since this code will be compiled
-    // Let's use a different approach with process.cwd()
-    const packageDir = process.cwd();
-    const scriptPath = path.join(packageDir, 'scripts', 'create-cursor-mdc-rules.js');
+    // Find the script relative to the CheckMate package using the path utility
+    const scriptPath = getScriptPath('create-cursor-mdc-rules.js');
     
     console.log(chalk.blue(`Looking for script at: ${scriptPath}`));
     

@@ -5,30 +5,34 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parse, stringify } from 'yaml';
+import { getScriptPath } from './paths.js';
 
 // Path to the Cursor config file
 const CURSOR_CONFIG_DIR = '.cursor';
 const CURSOR_CONFIG_FILE = path.join(CURSOR_CONFIG_DIR, 'config.yaml');
+
+// Get the absolute path to the cursor script
+const CURSOR_WRAPPER_SCRIPT = getScriptPath('cursor-task-wrapper.js');
 
 // Default rules to inject
 const DEFAULT_RULES = {
   pre_task: [
     {
       name: 'cm_scope',
-      cmd: 'node scripts/cursor-task-wrapper.js pre_task "checkmate affected"',
+      cmd: `node "${CURSOR_WRAPPER_SCRIPT}" pre_task "checkmate affected"`,
       env: { CM_LIST: '$OUTPUT' }
     }
   ],
   post_task: [
     {
       name: 'cm_verify',
-      cmd: 'node scripts/cursor-task-wrapper.js post_task "checkmate run --target \\"$CM_LIST\\""'
+      cmd: `node "${CURSOR_WRAPPER_SCRIPT}" post_task "checkmate run --target \\"$CM_LIST\\""`
     }
   ],
   post_push: [
     {
       name: 'cm_regress',
-      cmd: 'node scripts/cursor-task-wrapper.js post_push "checkmate run"'
+      cmd: `node "${CURSOR_WRAPPER_SCRIPT}" post_push "checkmate run"`
     }
   ]
 };

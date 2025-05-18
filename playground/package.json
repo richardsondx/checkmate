@@ -1,0 +1,13 @@
+{
+  "name": "checkmate-playground",
+  "version": "1.0.0",
+  "description": "Simple examples to test CheckMate's verification workflow",
+  "scripts": {
+    "test-string": "node string-utils/test.js",
+    "test-number": "node number-utils/test.js",
+    "test-array": "node array-utils/test.js",
+    "test-all": "npm run test-string && npm run test-number && npm run test-array"
+  },
+  "author": "",
+  "license": "MIT"
+} 

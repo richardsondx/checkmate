@@ -9,6 +9,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { printBanner } from '../ui/banner.js';
+import { getScriptPath } from '../lib/paths.js';
+
+// Absolute path to the spec-snapshot.js script
+const SPEC_SNAPSHOT_SCRIPT = getScriptPath('spec-snapshot.js');
 
 /**
  * Edit a specification file using the user's preferred editor
@@ -92,7 +96,7 @@ async function openEditor(filePath: string, cursor?: boolean): Promise<void> {
           if (!cursor) {
             console.log(`✅ Finished editing ${path.basename(filePath)}`);
             console.log(`${chalk.cyan('Remember:')} After editing a spec, create a new snapshot with:`);
-            console.log(`${chalk.green('  node scripts/spec-snapshot.js create')}`);
+            console.log(`${chalk.green(`  node "${SPEC_SNAPSHOT_SCRIPT}" create`)}`);
           }
           resolve();
         } else {

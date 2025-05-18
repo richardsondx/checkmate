@@ -9,6 +9,7 @@ import { callModel } from './models.js';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import crypto from 'crypto';
 import glob from 'fast-glob';
+import { getScriptPath } from './paths.js';
 
 // Directory where specs are stored
 const SPECS_DIR = 'checkmate/specs';
@@ -132,7 +133,8 @@ Format your response as a valid Markdown document.`;
       // Run the check format script to ensure proper checkbox format
       console.log('Running check format verification...');
       const { execSync } = await import('node:child_process');
-      execSync('node scripts/fix-check-format.js', { stdio: 'inherit' });
+      const scriptPath = getScriptPath('fix-check-format.js');
+      execSync(`node "${scriptPath}"`, { stdio: 'inherit' });
     } catch (formatError) {
       console.warn('Warning: Check format script execution failed:', formatError);
       // Continue with the process even if format checking fails
@@ -171,7 +173,8 @@ Format your response as a valid Markdown document.`;
       // Run the check format script to ensure proper checkbox format even for fallback content
       console.log('Running check format verification...');
       const { execSync } = await import('node:child_process');
-      execSync('node scripts/fix-check-format.js', { stdio: 'inherit' });
+      const scriptPath = getScriptPath('fix-check-format.js');
+      execSync(`node "${scriptPath}"`, { stdio: 'inherit' });
     } catch (formatError) {
       console.warn('Warning: Check format script execution failed:', formatError);
       // Continue with the process even if format checking fails
