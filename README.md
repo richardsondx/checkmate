@@ -233,8 +233,6 @@ Change model names any time and commit nothing sensitive.
 
 CheckMate provides clear visual indicators when tasks are running in Cursor:
 
-![CheckMate Task Indicators](https://via.placeholder.com/600x100?text=CheckMate+Task+Indicators)
-
 Each task type has a distinct visual style:
 
 | Task Type  | Visual Indicator                       | Description                       |
