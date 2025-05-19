@@ -1,4 +1,4 @@
-# CheckMate | [![Star on GitHub](https://img.shields.io/github/stars/richardsondx/checkmate?style=social)](https://github.com/richardsondx/checkmate/stargazers)
+# CheckMate | [![npm version](https://img.shields.io/npm/v/checkmateai.svg)](https://www.npmjs.com/package/checkmateai) [![Star on GitHub](https://img.shields.io/github/stars/richardsondx/checkmate?style=social)](https://github.com/richardsondx/checkmate/stargazers)
 
 By [@Richardsondx](https://x.com/richardsondx)
 
