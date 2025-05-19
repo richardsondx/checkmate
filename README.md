@@ -183,20 +183,22 @@ checkmate model set reason claude-3-haiku
 | Command | Description |
 |---------|-------------|
 | `checkmate warmup` | Scan repo, analyze code patterns, and suggest specs |
-| `checkmate gen "<sentence>"` | Create a spec from plain text. |
-| `checkmate gen -i "<sentence>"` | Interactive spec generation with approval workflow. |
-| `checkmate draft "<sentence>"` | Generate spec drafts as JSON without writing to disk. |
-| `checkmate save --json '<json>'` | Save approved spec drafts to disk. |
-| `checkmate status --target <spec>` | Check spec status, report passes/failures. |
-| `checkmate next` | Run the first unchecked step in the current branch. |
-| `checkmate affected` | Print spec names touched by the current diff. |
-| `checkmate clarify <slug>` | Explain why a requirement is failing and suggest fixes. |
-| `checkmate watch` | Live ASCII dashboard that updates in real-time as specs run. |
-| `checkmate watch --filter todo` | Dashboard filtered to specs containing "todo". |
-| `checkmate watch --spec user-auth --until-pass` | Watch a specific spec until it passes. |
-| `checkmate model set quick gpt-4o-mini` | Swap the model in the config. |
-| `checkmate stats` | Display token usage and estimated costs. |
-| `checkmate run-script <script-name> [...args]` | Run internal CheckMate utility scripts with proper paths. |
+| `checkmate gen "<sentence>"` | Create a regular markdown spec from plain text |
+| `checkmate gen "<sentence>" --agent` | Create an agent spec (YAML) from plain text |
+| `checkmate gen -i "<sentence>"` | Interactive spec generation with approval workflow |
+| `checkmate gen -i "<sentence>" --agent` | Interactive agent spec generation with approval workflow |
+| `checkmate draft "<sentence>"` | Generate spec drafts as JSON without writing to disk |
+| `checkmate save --json '<json>'` | Save approved spec drafts to disk |
+| `checkmate status --target <spec>` | Check spec status, report passes/failures |
+| `checkmate next` | Run the first unchecked step in the current branch |
+| `checkmate affected` | Print spec names touched by the current diff |
+| `checkmate clarify <slug>` | Explain why a requirement is failing and suggest fixes |
+| `checkmate watch` | Live ASCII dashboard that updates in real-time as specs run |
+| `checkmate watch --filter todo` | Dashboard filtered to specs containing "todo" |
+| `checkmate watch --spec user-auth --until-pass` | Watch a specific spec until it passes |
+| `checkmate model set quick gpt-4o-mini` | Swap the model in the config |
+| `checkmate stats` | Display token usage and estimated costs |
+| `checkmate run-script <script-name> [...args]` | Run internal CheckMate utility scripts with proper paths |
 
 ---
 
@@ -205,6 +207,7 @@ checkmate model set reason claude-3-haiku
 Need to...? | Try this:
 ------------|----------
 **Create a specification** | `checkmate gen "User can reset their password"`
+**Create an agent spec** | `checkmate gen "User can reset their password" --agent`
 **Check spec status** | `checkmate status --target user-password-reset`
 **Focus on a specific spec** | `checkmate status --target user-password-reset`
 **Monitor progress** | `checkmate watch` (in a separate terminal)

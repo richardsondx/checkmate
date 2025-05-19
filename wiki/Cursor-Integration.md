@@ -296,7 +296,14 @@ You can integrate CheckMate directly into your Cursor workflow using several app
 The simplest way to create a spec from Cursor is to use the included helper script:
 
 ```bash
+# For regular markdown specs
 node scripts/cursor-checkmate.js \
+  "Search developers endpoint" \
+  app/api/github/search/route.ts app/lead-finder/search/page.js
+
+# For agent specs (YAML format)
+node scripts/cursor-checkmate.js \
+  --agent \
   "Search developers endpoint" \
   app/api/github/search/route.ts app/lead-finder/search/page.js
 ```
@@ -308,7 +315,11 @@ This creates a specification with the given feature description and explicitly l
 For more complex integrations, use the `create` command with JSON:
 
 ```bash
+# For regular markdown specs
 checkmate create --json '{"feature": "Add webhook support", "files": ["src/api/webhooks/**"]}'
+
+# For agent specs (YAML format)
+checkmate create --json '{"feature": "Add webhook support", "files": ["src/api/webhooks/**"]}' --agent
 ```
 
 #### Using affected specs
@@ -398,6 +409,7 @@ The `non-interactive-mode.mdc` rule automatically transforms CheckMate commands 
 ```
 # Example transformations
 checkmate gen "Feature description" → checkmate gen "Feature description" --yes --non-interactive
+checkmate gen "Feature description" --agent → checkmate gen "Feature description" --agent --yes --non-interactive
 checkmate run → checkmate run --yes --non-interactive
 ```
 

@@ -8,6 +8,15 @@ This guide provides practical examples to get you started with CheckMate quickly
 # write a single‑sentence spec
 checkmate gen "A user can add a new todo with title and status"
 
+# for agent specs (YAML format)
+checkmate gen "A user can add a new todo with title and status" --agent
+
+# use interactive mode to review and edit specs before saving
+checkmate gen -i "A user can add a new todo with title and status"
+
+# interactive mode also works with agent specs
+checkmate gen -i "A user can add a new todo with title and status" --agent
+
 # let Cursor (or you) build the code
 # …
 

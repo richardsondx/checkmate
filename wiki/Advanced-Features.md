@@ -114,7 +114,11 @@ This works by comparing file content hashes and is especially helpful after majo
 Generate specs interactively with the `-i` flag:
 
 ```bash
+# Generate a regular markdown spec interactively
 checkmate gen -i "Find by Issues and by Repositories"
+
+# Generate an agent spec (YAML) interactively
+checkmate gen -i "Find by Issues and by Repositories" --agent
 ```
 
 This opens an interactive workflow that:

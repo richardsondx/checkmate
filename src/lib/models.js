@@ -155,17 +155,33 @@ function callModel(slot, systemPrompt, userPrompt) {
  * Mock implementation for tests to avoid actual API calls
  */
 function mockCallModel(slot, systemPrompt, userPrompt) {
-    console.log("[TEST] Mock model call to ".concat(slot, " with prompt: ").concat(userPrompt.substring(0, 50), "..."));
+    console.log(`[TEST] Mock model call to ${slot} with prompt: ${userPrompt.substring(0, 50)}...`);
+    
+    // Extract the feature title from the prompt for the reason model
+    let title = "Test Feature";
+    if (slot === 'reason') {
+        // Try to extract from various prompt formats
+        let titleMatch = userPrompt.match(/Feature: ([^\n]+)/);
+        if (!titleMatch) {
+            titleMatch = userPrompt.match(/feature:\s*([^\n]+)/i);
+        }
+        if (!titleMatch) {
+            titleMatch = userPrompt.match(/Generate.*for:\s*([^\n]+)/i);
+        }
+        
+        // For test-gen.mjs, which passes "Auto Answer Test" as the name
+        if (userPrompt.includes("Auto Answer Test")) {
+            title = "Auto Answer Test";
+        } else if (titleMatch && titleMatch[1]) {
+            title = titleMatch[1].trim();
+        }
+    }
+    
     if (slot === 'quick') {
         return "pass This is a mock response for testing purposes";
-    }
-    else {
-        // For reason model, return a JSON structure
-        return JSON.stringify({
-            suggestion: "This is a mock suggestion for testing",
-            next_action: "fix-code",
-            reason: "This is a mock reason for testing"
-        });
+    } else {
+        // For reason model, include the title in the response for tests
+        return `# ${title}\n\n## Checks\n- [ ] Check if input validation is correctly implemented\n- [ ] Verify that all edge cases are handled\n- [ ] Ensure proper error messages are displayed\n- [ ] Confirm data is saved correctly to the database`;
     }
 }
 /**

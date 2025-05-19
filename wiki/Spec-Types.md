@@ -41,6 +41,12 @@ User Specs are evaluated by AI, which examines your code to determine if each re
 
 Agent Specs use a structured YAML format that includes executable tests. They're more precise and can validate functionality programmatically.
 
+To generate an Agent Spec, use the `--agent` flag:
+
+```bash
+checkmate gen "User Authentication" --agent
+```
+
 Example Agent Spec:
 
 ```yaml
