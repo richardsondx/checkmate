@@ -2,7 +2,7 @@
 
 By [@Richardsondx](https://x.com/richardsondx)
 
-[![CheckMate Demo](https://img.youtube.com/vi/A2sqyblVxZk/0.jpg)](https://youtu.be/A2sqyblVxZk)
+[![CheckMate Demo](https://i3.ytimg.com/vi/fM8DmUkt7WY/maxresdefault.jpg)](https://youtu.be/fM8DmUkt7WY)
 
 
 AI-powered specs verification that block bad code, see through hallucination, and prevent AI from breaking your code.
