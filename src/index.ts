@@ -33,6 +33,7 @@ import chalk from 'chalk';
 import * as listChecksCommands from './commands/list-checks.js';
 import * as verifyLlmReasoningCommands from './commands/verify-llm-reasoning.js';
 import * as resetCommandModule from './commands/reset.js';
+import * as runScriptCommands from './commands/run-script.js';
 
 // Initialize yargs parser
 const yargsInstance = yargs(hideBin(process.argv));
@@ -732,124 +733,6 @@ yargsInstance
       await scaffoldCommands.scaffoldSpec(argv.path, options);
     }
   )
-
-  // ADVANCED & SYSTEM COMMANDS
-  .command(
-    'promote',
-    '(Role under review) Promote a Markdown spec to a YAML agent spec',
-    (yargs: Argv) => {
-      return yargs
-        .option('spec', {
-          describe: 'Markdown spec to convert to a YAML agent spec',
-          type: 'string',
-          demandOption: true,
-          alias: 's'
-        })
-        .option('selected-only', {
-          describe: 'Only promote requirements that are failing (not checked)',
-          type: 'boolean',
-          default: false
-        });
-    },
-    async (argv: any) => {
-      await promoteCommands.promoteCommand({
-        spec: argv.spec,
-        selectedOnly: argv.selectedOnly
-      });
-    }
-  )
-  .command(
-    'auto-files',
-    'Manage automatic file discovery for specs',
-    (yargs: Argv) => {
-      return yargs
-        .option('enable', {
-          describe: 'Enable auto-file discovery for specs',
-          type: 'boolean',
-          default: false
-        })
-        .option('update', {
-          describe: 'Update files for specs using auto-discovery',
-          type: 'boolean',
-          default: false
-        })
-        .option('spec', {
-          describe: 'Specific spec to process',
-          type: 'string'
-        })
-        .option('all', {
-          describe: 'Process all specs',
-          type: 'boolean',
-          default: false
-        })
-        .check((argv) => {
-          if (!argv.spec && !argv.all) {
-            throw new Error('Either --spec or --all is required');
-          }
-          if (!argv.enable && !argv.update) {
-            throw new Error('At least one of --enable or --update is required');
-          }
-          return true;
-        });
-    },
-    async (argv: any) => {
-      await autoFilesCommands.autoFilesCommand(
-        autoFilesCommands.parseAutoFilesArgs(argv)
-      );
-    }
-  )
-  .command(
-    'files', 
-    'List all code files in the project', 
-    (yargs: Argv) => {
-      return yargs
-        .option('ext', {
-          describe: 'File extensions to include',
-          type: 'array',
-          default: ['ts', 'js', 'tsx', 'jsx']
-        });
-    },
-    async (argv: any) => {
-      await treeCommands.listFiles(argv.ext);
-    }
-  )
-  .command(
-    'dirs', 
-    'List directories containing code files', 
-    {},
-    async () => {
-      await treeCommands.listDirectories();
-    }
-  )
-  .command(
-    'snap',
-    'Manage file snapshots and detect renames',
-    (yargs: Argv) => {
-      return yargs
-        .option('detect', {
-          describe: 'Detect renamed files',
-          type: 'boolean',
-          default: false
-        })
-        .option('repair', {
-          describe: 'Repair specs with renamed files',
-          type: 'boolean',
-          default: false
-        })
-        .option('auto', {
-          describe: 'Automatically apply all repairs without prompting',
-          type: 'boolean',
-          default: false
-        });
-    },
-    async (argv: any) => {
-      await snapCommands.snapCommand({
-        detect: argv.detect,
-        repair: argv.repair,
-        auto: argv.auto
-      });
-    }
-  )
   .command(
     'clean',
     'Clean the cache by removing entries for deleted specs',
@@ -866,6 +749,41 @@ yargsInstance
         await cleanCommands.forceCleanCache();
       } else {
         await cleanCommands.cleanCache();
+      }
+    }
+  )
+  .command(
+    'run-script <script-name> [args...]',
+    'Run a script from the CheckMate scripts directory with proper path resolution',
+    (yargs: Argv) => {
+      return yargs
+        .positional('script-name', {
+          describe: 'Name of the script to run (with or without .js extension)',
+          type: 'string',
+          demandOption: true
+        })
+        .positional('args', {
+          describe: 'Arguments to pass to the script',
+          type: 'string',
+          array: true
+        })
+        .option('quiet', {
+          describe: 'Suppress informational output about the script execution',
+          type: 'boolean',
+          default: false,
+          alias: 'q'
+        });
+    },
+    async (argv: any) => {
+      const exitCode = await runScriptCommands.runScriptCommand({
+        scriptName: argv['script-name'],
+        args: argv.args || [],
+        quiet: argv.quiet
+      });
+      
+      // Exit with the same code as the script
+      if (exitCode !== 0) {
+        process.exit(exitCode);
       }
     }
   )
